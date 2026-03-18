@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trading Skills Catalog</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #FAFAFA;
+      color: #1F2937;
+      line-height: 1.6;
+    }
+
+    a {
+      color: #3B82F6;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    section {
+      padding: 3rem 0;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+      color: #1F2937;
+    }
+
+    h3 {
+      font-size: 1.125rem;
+      margin-bottom: 1rem;
+      color: #374151;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
+      padding: 5rem 1.5rem 3rem;
+      background: linear-gradient(180deg, #FFFFFF 0%, #FAFAFA 100%);
+      border-bottom: 1px solid #E5E7EB;
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+
+    .hero p {
+      font-size: 1.125rem;
+      color: #6B7280;
+      margin-bottom: 2rem;
+    }
+
+    .btn-primary {
+      display: inline-block;
+      padding: 0.75rem 2rem;
+      background: #1F2937;
+      color: #FFFFFF;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: #374151;
+      text-decoration: none;
+    }
+
+    /* ── Stats Bar ── */
+    .stats-bar {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 1rem 2rem;
+      padding: 1.25rem 1.5rem;
+      background: #FFFFFF;
+      border-bottom: 1px solid #E5E7EB;
+      font-size: 0.9rem;
+      color: #6B7280;
+    }
+
+    .stats-bar span {
+      white-space: nowrap;
+    }
+
+    .stats-bar strong {
+      color: #1F2937;
+    }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+
+    .badge-free       { color: #10B981; background: #ECFDF5; }
+    .badge-fmp        { color: #3B82F6; background: #EFF6FF; }
+    .badge-websearch  { color: #F59E0B; background: #FFFBEB; }
+    .badge-other      { color: #9CA3AF; background: #F3F4F6; }
+    .badge-fmp-finviz { color: #8B5CF6; background: #F5F3FF; }
+    .badge-free-csv   { color: #10B981; background: #ECFDF5; }
+
+    .badge-lang {
+      display: inline-block;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      background: #F3F4F6;
+      color: #6B7280;
+      margin-left: 0.25rem;
+      vertical-align: middle;
+    }
+
+    /* ── Dependency Graph ── */
+    .dep-graph {
+      text-align: center;
+      padding: 3rem 0;
+      background: #FFFFFF;
+      border-bottom: 1px solid #E5E7EB;
+    }
+
+    .dep-graph h2 {
+      margin-bottom: 0.5rem;
+    }
+
+    .dep-graph p {
+      color: #6B7280;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .dep-graph svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .graph-node rect {
+      fill: #FFFFFF;
+      stroke: #E5E7EB;
+      stroke-width: 1.5;
+      rx: 6;
+      transition: fill 0.2s, stroke 0.2s;
+      cursor: pointer;
+    }
+
+    .graph-node text {
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 11px;
+      fill: #1F2937;
+      pointer-events: none;
+    }
+
+    .graph-node:hover rect {
+      fill: #EFF6FF;
+      stroke: #3B82F6;
+    }
+
+    .graph-edge {
+      stroke: #D1D5DB;
+      stroke-width: 1.5;
+      fill: none;
+      transition: stroke 0.2s, stroke-width 0.2s;
+    }
+
+    .graph-edge.dashed {
+      stroke-dasharray: 6 4;
+    }
+
+    .graph-edge.highlighted {
+      stroke: #3B82F6;
+      stroke-width: 2.5;
+    }
+
+    .graph-node.highlighted rect {
+      fill: #EFF6FF;
+      stroke: #3B82F6;
+    }
+
+    /* ── Category Cards ── */
+    .category {
+      padding: 2rem 0;
+    }
+
+    .category + .category {
+      border-top: 1px solid #E5E7EB;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1rem;
+    }
+
+    .card {
+      background: #FFFFFF;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      padding: 1.25rem;
+      cursor: pointer;
+      transition: box-shadow 0.2s, border-color 0.2s;
+    }
+
+    .card:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      border-color: #D1D5DB;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-name {
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #1F2937;
+    }
+
+    .card-name a {
+      color: inherit;
+    }
+
+    .card-name a:hover {
+      color: #3B82F6;
+    }
+
+    .card-desc {
+      font-size: 0.875rem;
+      color: #6B7280;
+      line-height: 1.5;
+    }
+
+    .card-triggers {
+      display: none;
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid #F3F4F6;
+      font-size: 0.8rem;
+      color: #9CA3AF;
+    }
+
+    .card-triggers .label {
+      font-weight: 600;
+      color: #6B7280;
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+
+    .card.expanded .card-triggers {
+      display: block;
+    }
+
+    .card-expand-hint {
+      font-size: 0.7rem;
+      color: #D1D5DB;
+      margin-top: 0.5rem;
+      text-align: right;
+    }
+
+    .card.expanded .card-expand-hint {
+      display: none;
+    }
+
+    /* ── Quick Start ── */
+    .quick-start {
+      background: #FFFFFF;
+      border-top: 1px solid #E5E7EB;
+    }
+
+    .quick-start pre {
+      background: #1F2937;
+      color: #E5E7EB;
+      padding: 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      line-height: 1.7;
+      margin-bottom: 2rem;
+    }
+
+    .quick-start code {
+      font-family: ui-monospace, SFMono-Regular, monospace;
+    }
+
+    .workflows {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+
+    .workflow-card {
+      background: #FAFAFA;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .workflow-card h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .workflow-card p {
+      font-size: 0.85rem;
+      color: #6B7280;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+    }
+
+    /* ── Footer ── */
+    footer {
+      padding: 2rem 1.5rem;
+      text-align: center;
+      border-top: 1px solid #E5E7EB;
+      color: #9CA3AF;
+      font-size: 0.85rem;
+    }
+
+    footer a {
+      color: #6B7280;
+    }
+
+    footer p + p {
+      margin-top: 0.5rem;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .hero h1 {
+        font-size: 1.75rem;
+      }
+
+      .hero p {
+        font-size: 1rem;
+      }
+
+      section {
+        padding: 2rem 0;
+      }
+
+      .card-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .workflows {
+        grid-template-columns: 1fr;
+      }
+
+      .dep-graph svg {
+        transform: scale(0.75);
+        transform-origin: top center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════════ Hero ════════ -->
+  <header class="hero">
+    <div class="container">
+      <h1>Trading Skills Catalog</h1>
+      <p>37 Claude Code skills for systematic trading analysis</p>
+      <a href="#quick-start" class="btn-primary">Get Started</a>
+    </div>
+  </header>
+
+  <!-- ════════ Stats Bar ════════ -->
+  <div class="stats-bar">
+    <span><strong>37</strong> skills</span>
+    <span><strong>5</strong> categories</span>
+    <span><strong>14</strong> free</span>
+    <span><strong>14</strong> FMP</span>
+    <span><strong>7</strong> WebSearch</span>
+    <span><strong>2</strong> other</span>
+  </div>
+
+  <!-- ════════ Dependency Graph ════════ -->
+  <div class="dep-graph">
+    <div class="container">
+      <h2>Strategy Synthesizer — Dependency Graph</h2>
+      <p>How <code>stanley-druckenmiller-investment</code> aggregates upstream skill outputs</p>
+
+      <svg viewBox="0 0 900 320" xmlns="http://www.w3.org/2000/svg" aria-label="Dependency graph showing stanley-druckenmiller-investment and its 8 upstream skills">
+        <!-- Edges (drawn first so nodes render on top) -->
+        <!-- Required edges (solid) -->
+        <line class="graph-edge" data-from="market-breadth" data-to="druckenmiller" x1="100" y1="140" x2="450" y2="60" />
+        <line class="graph-edge" data-from="uptrend" data-to="druckenmiller" x1="270" y1="140" x2="450" y2="60" />
+        <line class="graph-edge" data-from="market-top" data-to="druckenmiller" x1="440" y1="140" x2="450" y2="60" />
+        <line class="graph-edge" data-from="macro-regime" data-to="druckenmiller" x1="637" y1="140" x2="450" y2="60" />
+        <line class="graph-edge" data-from="ftd" data-to="druckenmiller" x1="800" y1="140" x2="450" y2="60" />
+        <!-- Optional edges (dashed) -->
+        <line class="graph-edge dashed" data-from="vcp" data-to="druckenmiller" x1="175" y1="260" x2="450" y2="60" />
+        <line class="graph-edge dashed" data-from="theme" data-to="druckenmiller" x1="450" y1="260" x2="450" y2="60" />
+        <line class="graph-edge dashed" data-from="canslim" data-to="druckenmiller" x1="720" y1="260" x2="450" y2="60" />
+
+        <!-- Top node: Druckenmiller -->
+        <g class="graph-node" data-id="druckenmiller">
+          <rect x="295" y="20" width="310" height="40" />
+          <text x="450" y="45" text-anchor="middle">stanley-druckenmiller-investment</text>
+        </g>
+
+        <!-- Required upstream row -->
+        <g class="graph-node" data-id="market-breadth">
+          <rect x="5" y="120" width="190" height="40" />
+          <text x="100" y="145" text-anchor="middle">market-breadth-analyzer</text>
+        </g>
+        <g class="graph-node" data-id="uptrend">
+          <rect x="205" y="120" width="130" height="40" />
+          <text x="270" y="145" text-anchor="middle">uptrend-analyzer</text>
+        </g>
+        <g class="graph-node" data-id="market-top">
+          <rect x="355" y="120" width="170" height="40" />
+          <text x="440" y="145" text-anchor="middle">market-top-detector</text>
+        </g>
+        <g class="graph-node" data-id="macro-regime">
+          <rect x="545" y="120" width="185" height="40" />
+          <text x="637" y="145" text-anchor="middle">macro-regime-detector</text>
+        </g>
+        <g class="graph-node" data-id="ftd">
+          <rect x="745" y="120" width="110" height="40" />
+          <text x="800" y="145" text-anchor="middle">ftd-detector</text>
+        </g>
+
+        <!-- Optional upstream row -->
+        <g class="graph-node" data-id="vcp">
+          <rect x="105" y="240" width="140" height="40" />
+          <text x="175" y="265" text-anchor="middle">vcp-screener</text>
+        </g>
+        <g class="graph-node" data-id="theme">
+          <rect x="375" y="240" width="150" height="40" />
+          <text x="450" y="265" text-anchor="middle">theme-detector</text>
+        </g>
+        <g class="graph-node" data-id="canslim">
+          <rect x="640" y="240" width="160" height="40" />
+          <text x="720" y="265" text-anchor="middle">canslim-screener</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ════════ Category Cards ════════ -->
+  <main class="container">
+
+    <!-- Category 1: Macro & Regime -->
+    <section class="category">
+      <h2>Macro &amp; Regime</h2>
+      <div class="card-grid">
+
+        <div class="card" data-skill="macro-regime-detector">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">macro-regime-detector</a></span>
+            <span class="badge badge-fmp">FMP</span>
+          </div>
+          <p class="card-desc">Structural shifts (concentration/broadening/contraction) over 1-2 year horizon</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Structural shifts, concentration, broadening, contraction, 1-2 year horizon, macro regime</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="macro-liquidity">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">macro-liquidity</a></span>
+            <span class="badge badge-websearch">WebSearch</span>
+            <span class="badge-lang">CN</span>
+          </div>
+          <p class="card-desc">Fed net liquidity, SOFR, MOVE index, yen carry trade signals</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Fed net liquidity, SOFR, MOVE index, yen carry trade, liquidity signals</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="us-market-sentiment">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">us-market-sentiment</a></span>
+            <span class="badge badge-websearch">WebSearch</span>
+            <span class="badge-lang">CN</span>
+          </div>
+          <p class="card-desc">NAAIM exposure, institutional allocation, retail flows, forward P/E, hedge fund leverage</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>NAAIM exposure, institutional allocation, retail flows, forward P/E, hedge fund leverage, market sentiment</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="us-market-bubble-detector">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">us-market-bubble-detector</a></span>
+            <span class="badge badge-free">Free</span>
+            <span class="badge-lang">CN</span>
+          </div>
+          <p class="card-desc">Minsky/Kindleberger framework v2.1 with quantitative scoring</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Minsky, Kindleberger, bubble detection, quantitative scoring, market bubble</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="economic-calendar-fetcher">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">economic-calendar-fetcher</a></span>
+            <span class="badge badge-fmp">FMP</span>
+          </div>
+          <p class="card-desc">Upcoming economic events with impact assessment</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Economic events, impact assessment, economic calendar, upcoming events</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Category 2: Market Breadth & Timing -->
+    <section class="category">
+      <h2>Market Breadth &amp; Timing</h2>
+      <div class="card-grid">
+
+        <div class="card" data-skill="market-breadth-analyzer">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">market-breadth-analyzer</a></span>
+            <span class="badge badge-free">Free</span>
+          </div>
+          <p class="card-desc">0-100 composite from 6 breadth metrics</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Market breadth, composite score, breadth metrics, advance/decline, new highs/lows</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="breadth-chart-analyst">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">breadth-chart-analyst</a></span>
+            <span class="badge badge-free">Free</span>
+          </div>
+          <p class="card-desc">S&amp;P 500 breadth index analysis from chart images</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>S&amp;P 500 breadth, chart analysis, breadth index, chart images</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="uptrend-analyzer">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">uptrend-analyzer</a></span>
+            <span class="badge badge-free">Free</span>
+          </div>
+          <p class="card-desc">Monty's uptrend ratio dashboard (5-component composite score)</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Uptrend ratio, composite score, trend analysis, uptrend dashboard</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="market-top-detector">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">market-top-detector</a></span>
+            <span class="badge badge-fmp">FMP</span>
+          </div>
+          <p class="card-desc">O'Neil distribution days + Minervini leadership + Monty defensive rotation</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Distribution days, O'Neil, Minervini leadership, defensive rotation, market top</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="ftd-detector">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">ftd-detector</a></span>
+            <span class="badge badge-fmp">FMP</span>
+          </div>
+          <p class="card-desc">Follow-through day bottom confirmation (dual-index S&amp;P 500 + NASDAQ)</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Follow-through day, bottom confirmation, FTD, S&amp;P 500, NASDAQ, market bottom</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Category 3: Stock Screening -->
+    <section class="category">
+      <h2>Stock Screening</h2>
+      <div class="card-grid">
+
+        <div class="card" data-skill="canslim-screener">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">canslim-screener</a></span>
+            <span class="badge badge-fmp">FMP</span>
+          </div>
+          <p class="card-desc">William O'Neil 7-component growth methodology</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>CAN SLIM, William O'Neil, growth screening, 7-component, earnings growth</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="vcp-screener">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">vcp-screener</a></span>
+            <span class="badge badge-fmp">FMP</span>
+          </div>
+          <p class="card-desc">Mark Minervini volatility contraction pattern (S&amp;P 500)</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>VCP, volatility contraction, Minervini, S&amp;P 500, breakout pattern</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="value-dividend-screener">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">value-dividend-screener</a></span>
+            <span class="badge badge-fmp-finviz">FMP+FINVIZ</span>
+          </div>
+          <p class="card-desc">P/E&lt;20, P/B&lt;2, 3%+ yield, consistent growth</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Value investing, dividend, P/E ratio, P/B ratio, yield, consistent growth</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="dividend-growth-pullback-screener">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">dividend-growth-pullback-screener</a></span>
+            <span class="badge badge-fmp-finviz">FMP+FINVIZ</span>
+          </div>
+          <p class="card-desc">12%+ dividend CAGR + RSI oversold timing</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Dividend growth, CAGR, RSI oversold, pullback, timing</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="finviz-screener">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">finviz-screener</a></span>
+            <span class="badge badge-free">Free</span>
+          </div>
+          <p class="card-desc">Natural language to FinViz URL with 500+ filters</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>FinViz, natural language, stock screener, filters, screening URL</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="pead-screener">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">pead-screener</a></span>
+            <span class="badge badge-fmp">FMP</span>
+          </div>
+          <p class="card-desc">Post-earnings announcement drift (red candle pullback signals)</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>PEAD, post-earnings drift, pullback, red candle, earnings announcement</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="pair-trade-screener">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">pair-trade-screener</a></span>
+            <span class="badge badge-fmp">FMP</span>
+          </div>
+          <p class="card-desc">Statistical arbitrage (cointegration, z-scores, entry/exit)</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Pair trading, statistical arbitrage, cointegration, z-scores, entry/exit signals</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="earnings-trade-analyzer">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">earnings-trade-analyzer</a></span>
+            <span class="badge badge-fmp">FMP</span>
+          </div>
+          <p class="card-desc">Post-earnings 5-factor scoring (A/B/C/D grades)</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Earnings trade, 5-factor scoring, post-earnings, grading, trade analysis</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="institutional-flow-tracker">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">institutional-flow-tracker</a></span>
+            <span class="badge badge-fmp">FMP</span>
+          </div>
+          <p class="card-desc">13F filings smart money accumulation/distribution</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>13F filings, institutional flow, smart money, accumulation, distribution</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="theme-detector">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">theme-detector</a></span>
+            <span class="badge badge-free">Free</span>
+          </div>
+          <p class="card-desc">Cross-sector trending themes with lifecycle analysis</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Theme detection, cross-sector, trending themes, lifecycle analysis</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Category 4: Stock Analysis & Reports -->
+    <section class="category">
+      <h2>Stock Analysis &amp; Reports</h2>
+      <div class="card-grid">
+
+        <div class="card" data-skill="us-stock-analysis">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">us-stock-analysis</a></span>
+            <span class="badge badge-fmp">FMP</span>
+          </div>
+          <p class="card-desc">Comprehensive fundamental + technical + peer comparison</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Stock analysis, fundamental, technical, peer comparison, comprehensive analysis</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="us-value-investing">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/star23/Day1Global-Skills" target="_blank" rel="noopener">us-value-investing</a></span>
+            <span class="badge badge-websearch">WebSearch</span>
+            <span class="badge-lang">CN</span>
+          </div>
+          <p class="card-desc">4-dimension Buffett framework (ROE, leverage, FCF, moat)</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Value investing, Buffett, ROE, leverage, FCF, moat, 4-dimension analysis</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="tech-earnings-deepdive">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/star23/Day1Global-Skills" target="_blank" rel="noopener">tech-earnings-deepdive</a></span>
+            <span class="badge badge-websearch">WebSearch</span>
+            <span class="badge-lang">CN</span>
+          </div>
+          <p class="card-desc">16-module analysis + 6 investment philosophy perspectives</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Tech earnings, 16-module, investment philosophy, deep dive, earnings analysis</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="earnings-calendar">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">earnings-calendar</a></span>
+            <span class="badge badge-fmp">FMP</span>
+          </div>
+          <p class="card-desc">Upcoming earnings (mid-cap+, by date/timing)</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Earnings calendar, upcoming earnings, mid-cap, earnings date, timing</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="sector-analyst">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">sector-analyst</a></span>
+            <span class="badge badge-free">Free</span>
+          </div>
+          <p class="card-desc">Sector rotation, cyclical vs defensive, market cycle positioning</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Sector rotation, cyclical, defensive, market cycle, sector analysis</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="scenario-analyzer">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">scenario-analyzer</a></span>
+            <span class="badge badge-websearch">WebSearch</span>
+            <span class="badge-lang">JP</span>
+          </div>
+          <p class="card-desc">News headline to 18-month scenario prediction + stock picks</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Scenario analysis, news headline, prediction, stock picks, 18-month outlook</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="market-news-analyst">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">market-news-analyst</a></span>
+            <span class="badge badge-websearch">WebSearch</span>
+          </div>
+          <p class="card-desc">10-day news impact-ranked analysis</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Market news, impact ranking, news analysis, 10-day, news impact</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Category 5: Strategy & Execution -->
+    <section class="category">
+      <h2>Strategy &amp; Execution</h2>
+      <div class="card-grid">
+
+        <div class="card" data-skill="stanley-druckenmiller-investment">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">stanley-druckenmiller-investment</a></span>
+            <span class="badge badge-other">Other</span>
+          </div>
+          <p class="card-desc">Strategy synthesizer: 8 upstream skills to 0-100 conviction score</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Druckenmiller, strategy synthesis, conviction score, upstream aggregation, investment strategy</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="options-strategy-advisor">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">options-strategy-advisor</a></span>
+            <span class="badge badge-free">Free</span>
+          </div>
+          <p class="card-desc">Black-Scholes, Greeks, 17+ strategies, P/L simulation</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Options, Black-Scholes, Greeks, P/L simulation, options strategy</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="position-sizer">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">position-sizer</a></span>
+            <span class="badge badge-free">Free</span>
+          </div>
+          <p class="card-desc">Kelly/ATR/fixed-fraction risk-based sizing</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Position sizing, Kelly criterion, ATR, fixed-fraction, risk-based sizing</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="portfolio-manager">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">portfolio-manager</a></span>
+            <span class="badge badge-other">Other</span>
+          </div>
+          <p class="card-desc">Alpaca MCP portfolio analysis + rebalancing</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Portfolio management, Alpaca, rebalancing, portfolio analysis</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="backtest-expert">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">backtest-expert</a></span>
+            <span class="badge badge-free">Free</span>
+          </div>
+          <p class="card-desc">Robustness testing, slippage modeling, bias prevention</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Backtesting, robustness, slippage, bias prevention, strategy testing</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="trade-hypothesis-ideator">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">trade-hypothesis-ideator</a></span>
+            <span class="badge badge-free">Free</span>
+          </div>
+          <p class="card-desc">Falsifiable hypothesis cards with kill criteria</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Trade hypothesis, falsifiable, kill criteria, hypothesis cards, trade ideas</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="market-environment-analysis">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">market-environment-analysis</a></span>
+            <span class="badge badge-free">Free</span>
+            <span class="badge-lang">JP</span>
+          </div>
+          <p class="card-desc">Global markets risk-on/risk-off assessment</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Market environment, risk-on, risk-off, global markets, assessment</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="btc-bottom-model">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">btc-bottom-model</a></span>
+            <span class="badge badge-websearch">WebSearch</span>
+            <span class="badge-lang">CN</span>
+          </div>
+          <p class="card-desc">BTC bottom timing via 6 indicators (RSI, MVRV, miner, LTH)</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Bitcoin bottom, BTC, RSI, MVRV, miner capitulation, long-term holder</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="risk-management">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">risk-management</a></span>
+            <span class="badge badge-free">Free</span>
+          </div>
+          <p class="card-desc">Risk management framework</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Risk management, portfolio risk, drawdown, risk framework</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+        <div class="card" data-skill="technical-analyst">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/tradermonty/claude-trading-skills" target="_blank" rel="noopener">technical-analyst</a></span>
+            <span class="badge badge-free">Free</span>
+          </div>
+          <p class="card-desc">Weekly chart analysis (trends, S/R, volume, scenarios)</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>Technical analysis, weekly chart, support/resistance, volume, trend analysis</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ════════ Quick Start ════════ -->
+  <section class="quick-start" id="quick-start">
+    <div class="container">
+      <h2>Quick Start</h2>
+      <pre><code># Clone the repo
+git clone https://github.com/user/trading-skills-catalog.git
+
+# Install prerequisites (most skills from tradermonty)
+git clone https://github.com/tradermonty/claude-trading-skills.git
+cd claude-trading-skills && ./install.sh
+
+# Install trading-hub entry point
+cd trading-skills-catalog && ./install.sh
+
+# Set up FMP API key (optional, enables 14 additional skills)
+export FMP_API_KEY=your_key_here</code></pre>
+
+      <h3>Recommended Workflows</h3>
+      <div class="workflows">
+        <div class="workflow-card">
+          <h3>Morning Review</h3>
+          <p>economic-calendar &rarr; market-news &rarr; breadth &rarr; sector &rarr; bubble-detector</p>
+        </div>
+        <div class="workflow-card">
+          <h3>Stock Screening</h3>
+          <p>canslim / vcp / theme &rarr; us-stock-analysis &rarr; position-sizer</p>
+        </div>
+        <div class="workflow-card">
+          <h3>Earnings Season</h3>
+          <p>earnings-calendar &rarr; tech-earnings-deepdive &rarr; earnings-trade-analyzer</p>
+        </div>
+        <div class="workflow-card">
+          <h3>Strategy Synthesis</h3>
+          <p>run 8 upstream skills &rarr; stanley-druckenmiller-investment</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ Footer ════════ -->
+  <footer>
+    <div class="container">
+      <p><a href="https://github.com/user/trading-skills-catalog">GitHub</a> &middot; MIT License</p>
+      <p>Skills by <a href="https://github.com/tradermonty/claude-trading-skills">tradermonty/claude-trading-skills</a> and <a href="https://github.com/star23/Day1Global-Skills">Day1Global</a></p>
+    </div>
+  </footer>
+
+  <!-- ════════ Inline Script ════════ -->
+  <script>
+    (function () {
+      // (a) Card click toggles trigger keywords visibility
+      var cards = document.querySelectorAll('.card');
+      cards.forEach(function (card) {
+        card.addEventListener('click', function (e) {
+          // Don't toggle if clicking a link
+          if (e.target.tagName === 'A') return;
+          card.classList.toggle('expanded');
+        });
+      });
+
+      // (b) SVG hover highlight for dependency graph
+      var nodes = document.querySelectorAll('.graph-node');
+      var edges = document.querySelectorAll('.graph-edge');
+
+      nodes.forEach(function (node) {
+        var nodeId = node.getAttribute('data-id');
+
+        node.addEventListener('mouseenter', function () {
+          node.classList.add('highlighted');
+          edges.forEach(function (edge) {
+            var from = edge.getAttribute('data-from');
+            var to = edge.getAttribute('data-to');
+            if (from === nodeId || to === nodeId) {
+              edge.classList.add('highlighted');
+              // Also highlight the connected node
+              var connectedId = from === nodeId ? to : from;
+              var connectedNode = document.querySelector('.graph-node[data-id="' + connectedId + '"]');
+              if (connectedNode) connectedNode.classList.add('highlighted');
+            }
+          });
+        });
+
+        node.addEventListener('mouseleave', function () {
+          nodes.forEach(function (n) { n.classList.remove('highlighted'); });
+          edges.forEach(function (e) { e.classList.remove('highlighted'); });
+        });
+      });
+    })();
+  </script>
+
+</body>
+</html>
