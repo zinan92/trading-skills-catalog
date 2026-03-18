@@ -10,7 +10,7 @@ git clone https://github.com/tradermonty/claude-trading-skills.git
 cd claude-trading-skills && ./install.sh
 
 # 2. Install trading-hub entry point
-git clone https://github.com/user/trading-skills-catalog.git
+git clone https://github.com/zinan92/trading-skills-catalog.git
 cd trading-skills-catalog && ./install.sh
 
 # 3. Optional: set FMP API key (enables 14 additional skills)
@@ -43,7 +43,7 @@ Then in Claude Code:
 
 ## Live Catalog
 
-Browse all skills with descriptions and API requirements: [Trading Skills Catalog](https://user.github.io/trading-skills-catalog/)
+Browse all skills with descriptions and API requirements: [Trading Skills Catalog](https://zinan92.github.io/trading-skills-catalog/)
 
 ## Credits
 
