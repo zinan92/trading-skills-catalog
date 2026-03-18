@@ -1,15 +1,15 @@
 ---
 name: trading-hub
-description: Unified entry point for 39 trading analysis skills. Browse by category or run preset workflows (morning review, stock screening, earnings season, strategy synthesis).
+description: Unified entry point for 44 trading analysis skills. Browse by category or run preset workflows (morning review, stock screening, earnings season, strategy synthesis).
 ---
 
 # Trading Hub
 
-You are the Trading Hub — a unified entry point for 39 trading analysis skills organized into 4 preset workflows and 5 browsable categories.
+You are the Trading Hub — a unified entry point for 44 trading analysis skills organized into 4 preset workflows and 6 browsable categories.
 
 ## Step 1: Present the Main Menu
 
-Use the `AskUserQuestion` tool to present these 9 options:
+Use the `AskUserQuestion` tool to present these 10 options:
 
 **Workflows:**
 1. Morning Review — economic calendar → market news → breadth → sector → bubble detector
@@ -23,6 +23,7 @@ Use the `AskUserQuestion` tool to present these 9 options:
 7. Stock Screening (10 skills)
 8. Stock Analysis & Reports (9 skills)
 9. Strategy & Execution (10 skills)
+10. A 股分析 (5 skills)
 
 ## Step 2: Handle Selection
 
@@ -74,7 +75,7 @@ After the final skill, provide a consolidated morning briefing summary.
 3. Run any selected optional screeners.
 4. Invoke `stanley-druckenmiller-investment` via `Skill` tool to synthesize all upstream data into a 0-100 conviction score.
 
-### Category Browse (Options 5-9)
+### Category Browse (Options 5-10)
 
 When the user selects a category, show a Level 2 menu via `AskUserQuestion` listing all skills in that category. Use "name — description" as option labels.
 
@@ -127,12 +128,20 @@ When the user selects a category, show a Level 2 menu via `AskUserQuestion` list
 - risk-management — Risk management framework
 - technical-analyst — Weekly chart analysis
 
+**A 股分析:**
+- ashare-daily-review — A股日度复盘（涨停分析、板块强弱、异常信号）
+- ashare-concept-tracker — 概念板块热度追踪与成分股分析
+- ashare-signal-scanner — 多维度感知信号扫描（价格/量/资金流）
+- ashare-stock-screener — 自然语言条件选股
+- ashare-watchlist-briefing — 自选股每日简报与风险提示
+
 When the user picks a skill from a category menu, invoke it via `Skill` tool (e.g., `skill: "macro-regime-detector"`).
 
 ## Error Handling
 
 - If a skill invocation fails, report the error clearly and use `AskUserQuestion` to ask: "Skip this step and continue, or stop?"
 - Before invoking any FMP-dependent skill (macro-regime-detector, economic-calendar-fetcher, market-top-detector, ftd-detector, canslim-screener, vcp-screener, value-dividend-screener, dividend-growth-pullback-screener, pead-screener, pair-trade-screener, earnings-trade-analyzer, institutional-flow-tracker, us-stock-analysis, earnings-calendar), note: "This skill requires FMP_API_KEY. Results may be limited without it."
+- A 股分析 skills require quant-data-pipeline running on localhost:8000.
 
 ## Complete Skill Registry
 
@@ -177,3 +186,8 @@ When the user picks a skill from a category menu, invoke it via `Skill` tool (e.
 | btc-bottom-model | Strategy & Execution | BTC bottom via 6 indicators | WebSearch | CN |
 | risk-management | Strategy & Execution | Risk management framework | Free | EN |
 | technical-analyst | Strategy & Execution | Weekly chart analysis | Free | EN |
+| ashare-daily-review | A 股分析 | A股日度复盘 | Local API | CN |
+| ashare-concept-tracker | A 股分析 | 概念板块追踪 | Local API | CN |
+| ashare-signal-scanner | A 股分析 | 感知信号扫描 | Local API | CN |
+| ashare-stock-screener | A 股分析 | 条件选股 | Local API | CN |
+| ashare-watchlist-briefing | A 股分析 | 自选股简报 | Local API | CN |
