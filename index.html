@@ -1511,18 +1511,98 @@ export FMP_API_KEY=your_key_here</code></pre>
         document.querySelector('.right-panel').classList.toggle('visible');
       });
 
-      // Workflow row click → send to chat
+      // ── Actionable prompts for workflows and skills ──
+
+      var workflowPrompts = {
+        'Morning Review': '请做一次完整的晨间市场复盘：1) 本周重要经济数据和事件 2) 近10天影响市场的重大新闻 3) 当前市场广度和参与度 4) 板块轮动情况 5) 是否有泡沫风险信号',
+        'Stock Screening': '请帮我筛选值得关注的股票。先问我偏好什么风格（成长/价值/动量/主题），然后根据我的选择进行分析，最后给出候选标的和建议仓位大小',
+        'Earnings Season': '请帮我做财报季分析：1) 本周有哪些重要公司发布财报 2) 我选定标的后，做深度财报分析 3) 评估财报后的交易机会评分',
+        'Strategy Synthesis': '请做一次完整的策略合成分析：评估当前市场广度、上升趋势强度、是否出现顶部信号、宏观体制状态、是否确认底部，最终给我一个 0-100 的综合确信度评分和仓位建议',
+        'A 股复盘': '请做一次完整的 A 股复盘：1) 今日涨停板分析和涨停原因 2) 板块强弱排行和轮动信号 3) 异常放量和偏离均线的个股 4) 热门概念板块追踪 5) 多维度感知信号扫描 6) 我的自选股表现'
+      };
+
+      var skillPrompts = {
+        'macro-regime-detector': '请分析当前市场所处的宏观体制阶段（集中/扩散/收缩/通胀/转型），评估未来1-2年的结构性趋势',
+        'macro-liquidity': '请分析当前美联储净流动性状况，包括 SOFR 利率、MOVE 美债波动率指数、日元套利交易信号，评估流动性是在收紧还是宽松',
+        'us-market-sentiment': '请分析当前美股市场情绪：NAAIM 暴露指数、机构股票配置比例、散户净买入额、标普500远期市盈率、对冲基金杠杆率',
+        'us-market-bubble-detector': '请用 Minsky/Kindleberger 框架评估当前市场是否存在泡沫风险，给出量化评分',
+        'economic-calendar-fetcher': '请告诉我本周和下周有哪些重要的经济数据发布和央行决议，按影响程度排序',
+        'market-breadth-analyzer': '请分析当前市场广度健康状况，给出 0-100 的综合评分',
+        'breadth-chart-analyst': '请分析 S&P 500 广度指标（200日均线以上股票比例），判断市场参与度是在扩大还是萎缩',
+        'uptrend-analyzer': '请分析当前市场上升趋势的强度，用多维度指标评估市场环境是否支持增加股票仓位',
+        'market-top-detector': '请检测当前市场是否出现顶部信号：O\'Neil 分配日计数、领先股恶化程度、防御性板块轮动信号',
+        'ftd-detector': '请检测当前市场是否出现 Follow-Through Day（底部确认信号），评估是否可以安全增加仓位',
+        'canslim-screener': '请用 William O\'Neil 的 CANSLIM 方法帮我筛选成长股：当前每股盈余增长 ≥25%、年度盈余增长、新产品/新管理层、供需关系、领导股、机构持股、市场方向',
+        'vcp-screener': '请用 Mark Minervini 的波动率收缩模式（VCP）帮我在 S&P 500 中寻找处于 Stage 2 上升趋势中形成紧密基部的突破候选股',
+        'value-dividend-screener': '请帮我筛选高质量价值股息股：PE<20、PB<2、股息率≥3%、连续3年股息/营收/EPS增长',
+        'dividend-growth-pullback-screener': '请帮我找股息增长率≥12%、当前股息率≥1.5%、且 RSI 处于超卖区间（≤40）的股票',
+        'finviz-screener': '请帮我构建一个 FinViz 筛选器 URL。我会告诉你筛选条件，你帮我转换成 FinViz 的过滤参数',
+        'pead-screener': '请筛选近期财报后跳空上涨的股票，分析它们的周线形态，寻找红色蜡烛回调后的突破机会（PEAD 漂移交易信号）',
+        'pair-trade-screener': '请帮我寻找统计套利配对交易机会：在同一板块内找到协整关系强的股票对，分析价差行为和 Z-score',
+        'earnings-trade-analyzer': '请分析近期发布财报的股票，用5因子评分模型（缺口大小、财报前趋势、量能趋势、MA200位置、MA50位置）给出 A/B/C/D 评级',
+        'institutional-flow-tracker': '请追踪最新的 13F 机构持仓变化，找出大型对冲基金和共同基金正在大量增持或减持的股票',
+        'theme-detector': '请检测当前市场上正在形成的投资主题和热门板块，分析每个主题的生命周期阶段（早期/中期/晚期/衰竭）',
+        'us-stock-analysis': '请帮我做一只美股的综合分析。我会告诉你股票代码，你做基本面+技术面+同行对比的完整研究',
+        'us-value-investing': '请用巴菲特价值投资四维框架（ROE持续性、负债安全性、自由现金流质量、护城河评估）分析一只股票。我会告诉你代码',
+        'tech-earnings-deepdive': '请帮我做一只科技股的财报深度分析：16大模块 + 6大投资哲学视角（巴菲特/ARK/Tiger/Klarman/Tepper/Druckenmiller），我会告诉你公司名',
+        'earnings-calendar': '请告诉我本周有哪些重要公司发布财报，按市值排序，标注盘前/盘后',
+        'sector-analyst': '请分析当前板块轮动格局：哪些板块在周期中处于领先/滞后位置，是进攻型还是防御型板块在主导',
+        'scenario-analyzer': '请基于一条新闻标题，分析未来18个月的可能情景，推演一级/二级/三级影响，并给出推荐关注的股票',
+        'market-news-analyst': '请分析过去10天最重要的市场新闻，按影响力排序，评估每条新闻对股票和商品市场的影响',
+        'stock-research-executor': '请帮我对一只股票做系统性深度尽调（8阶段研究框架）。我会告诉你股票代码',
+        'trading-plan-generator': '请帮我生成一份完整的交易计划：包括交易目标、风险管理规则（1%规则、2R最低要求）、入场/出场规则、仓位管理、心理纪律',
+        'stanley-druckenmiller-investment': '请运行 Druckenmiller 策略合成器：综合市场广度、上升趋势、顶部检测、宏观体制、底部确认等多维度数据，给出 0-100 的综合确信度评分和资产配置建议',
+        'options-strategy-advisor': '请帮我分析期权策略。我会告诉你标的和看法，你帮我选择合适的期权策略（covered call / protective put / spread / iron condor 等），计算Greeks和盈亏',
+        'position-sizer': '请帮我计算合适的仓位大小。我会告诉你入场价和止损价，你用 Kelly 准则 / ATR 方法计算风险仓位',
+        'portfolio-manager': '请分析我的投资组合：资产配置、风险指标、个股仓位、分散化程度，给出再平衡建议',
+        'backtest-expert': '请帮我评估一个交易策略的回测质量：检查过拟合风险、滑点模型、样本外表现、参数稳健性',
+        'trade-hypothesis-ideator': '请帮我把一个交易想法转化为可证伪的假设卡片，包括入场逻辑、预期结果、kill criteria、实验设计',
+        'market-environment-analysis': '请做一次全球市场环境分析：美股、欧股、亚太、外汇、大宗商品的风险偏好状态（risk-on vs risk-off）',
+        'btc-bottom-model': '请用6大核心指标（RSI技术超跌、成交量萎缩、MVRV比率、社交媒体恐慌指数、矿机关机价、长期持有者行为）评估比特币是否进入抄底区间',
+        'risk-management': '请帮我建立或审查风险管理框架：单笔最大亏损、最大回撤限制、相关性风险、黑天鹅对冲',
+        'technical-analyst': '请帮我做一只股票的周线技术分析：趋势判断、支撑/阻力位、成交量分析、多空情景概率评估',
+        'ashare-daily-review': '请做今天的 A 股日度复盘：涨停板分析（数量、原因、连板）、板块强弱 TOP5、板块轮动信号、异常放量个股、明日关注方向',
+        'ashare-concept-tracker': '请追踪今天 A 股最热的概念板块 TOP 10，我选一个概念后帮我看成分股表现',
+        'ashare-signal-scanner': '请扫描 A 股市场的多维度感知信号：价格异常（突破/极端波动）、成交量信号（放量/缩量）、资金流信号（机构吸筹/出货），按强度排序 TOP 10',
+        'ashare-stock-screener': '请帮我筛选 A 股。我会用自然语言描述条件（比如"PE低于20且ROE大于15%"），你帮我找到匹配的股票',
+        'ashare-watchlist-briefing': '请帮我看一下自选股的表现：每只股票的涨跌幅、均线排列、K线形态、所属概念、异常信号和风险提示'
+      };
+
+      // Helper: send a prompt to chat
+      function sendPromptToChat(prompt) {
+        if (!gateway.connected) {
+          addMessage('system', '请先点击 Connect 连接 Gateway。');
+          return;
+        }
+        var input = document.getElementById('chatInput');
+        input.value = prompt;
+        sendMessage();
+      }
+
+      // Workflow row click → send actionable prompt
       document.querySelectorAll('.wf-row').forEach(function(row) {
         row.style.cursor = 'pointer';
         row.addEventListener('click', function() {
-          if (!gateway.connected) {
-            addMessage('system', 'Connect to Gateway first to run workflows.');
-            return;
+          var label = row.querySelector('.wf-label').textContent.trim();
+          var prompt = workflowPrompts[label];
+          if (prompt) {
+            sendPromptToChat(prompt);
           }
-          var label = row.querySelector('.wf-label').textContent;
-          var input = document.getElementById('chatInput');
-          input.value = 'Run workflow: ' + label;
-          sendMessage();
+        });
+      });
+
+      // Skill card click → send actionable prompt (only if not clicking a link)
+      document.querySelectorAll('.card[data-skill]').forEach(function(card) {
+        card.addEventListener('click', function(e) {
+          // Don't interfere with link clicks or expand toggle
+          if (e.target.tagName === 'A') return;
+          var skillName = card.getAttribute('data-skill');
+          var prompt = skillPrompts[skillName];
+          if (prompt && gateway.connected) {
+            e.stopPropagation(); // prevent expand toggle
+            sendPromptToChat(prompt);
+          }
+          // If not connected, let the normal expand toggle work
         });
       });
     })();
