@@ -122,6 +122,7 @@
     .badge-fmp        { color: #3B82F6; background: #EFF6FF; }
     .badge-websearch  { color: #F59E0B; background: #FFFBEB; }
     .badge-other      { color: #9CA3AF; background: #F3F4F6; }
+    .badge-localapi   { color: #14B8A6; background: #F0FDFA; }
     .badge-fmp-finviz { color: #8B5CF6; background: #F5F3FF; }
     .badge-free-csv   { color: #10B981; background: #ECFDF5; }
 
@@ -383,18 +384,19 @@
   <header class="hero">
     <div class="container">
       <h1>Trading Skills Catalog</h1>
-      <p>39 Claude Code skills for systematic trading analysis</p>
+      <p>44 Claude Code skills for systematic trading analysis</p>
       <a href="#quick-start" class="btn-primary">Get Started</a>
     </div>
   </header>
 
   <!-- ════════ Stats Bar ════════ -->
   <div class="stats-bar">
-    <span><strong>39</strong> skills</span>
-    <span><strong>5</strong> categories</span>
+    <span><strong>44</strong> skills</span>
+    <span><strong>6</strong> categories</span>
     <span><strong>14</strong> free</span>
     <span><strong>14</strong> FMP</span>
     <span><strong>7</strong> WebSearch</span>
+    <span><strong>5</strong> Local API</span>
     <span><strong>4</strong> other</span>
   </div>
 
@@ -900,6 +902,63 @@
           <p class="card-expand-hint">click to expand</p>
         </div>
 
+      </div>
+    </section>
+
+    <!-- Category 6: A 股分析 -->
+    <section class="category">
+      <h2>A 股分析</h2>
+      <div class="card-grid">
+        <div class="card" data-skill="ashare-daily-review">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/zinan92/trading-skills-catalog" target="_blank" rel="noopener">ashare-daily-review</a></span>
+            <span class="badge badge-localapi">Local API</span>
+            <span class="badge-lang">CN</span>
+          </div>
+          <p class="card-desc">A股日度复盘 — 涨停分析、板块强弱、轮动信号、异常检测</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>A股复盘, 今日复盘, 涨停分析, daily review</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+        <div class="card" data-skill="ashare-concept-tracker">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/zinan92/trading-skills-catalog" target="_blank" rel="noopener">ashare-concept-tracker</a></span>
+            <span class="badge badge-localapi">Local API</span>
+            <span class="badge-lang">CN</span>
+          </div>
+          <p class="card-desc">概念板块热度追踪 — TOP排行、成分股表现、板块联动</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>概念板块, 板块追踪, 热门概念, concept tracker</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+        <div class="card" data-skill="ashare-signal-scanner">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/zinan92/trading-skills-catalog" target="_blank" rel="noopener">ashare-signal-scanner</a></span>
+            <span class="badge badge-localapi">Local API</span>
+            <span class="badge-lang">CN</span>
+          </div>
+          <p class="card-desc">多维度感知信号扫描 — 价格、成交量、资金流信号聚合排序</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>信号扫描, 异常检测, 感知信号, signal scanner</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+        <div class="card" data-skill="ashare-stock-screener">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/zinan92/trading-skills-catalog" target="_blank" rel="noopener">ashare-stock-screener</a></span>
+            <span class="badge badge-localapi">Local API</span>
+            <span class="badge-lang">CN</span>
+          </div>
+          <p class="card-desc">自然语言条件选股 — 用中文描述筛选条件，返回匹配A股</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>A股筛选, 选股, 条件筛选, stock screener</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
+        <div class="card" data-skill="ashare-watchlist-briefing">
+          <div class="card-header">
+            <span class="card-name"><a href="https://github.com/zinan92/trading-skills-catalog" target="_blank" rel="noopener">ashare-watchlist-briefing</a></span>
+            <span class="badge badge-localapi">Local API</span>
+            <span class="badge-lang">CN</span>
+          </div>
+          <p class="card-desc">自选股每日简报 — 个股表现、均线评估、K线形态、风险提示</p>
+          <div class="card-triggers"><span class="label">Trigger keywords</span>自选股简报, 持仓分析, 自选股怎么样, watchlist briefing</div>
+          <p class="card-expand-hint">click to expand</p>
+        </div>
       </div>
     </section>
 
