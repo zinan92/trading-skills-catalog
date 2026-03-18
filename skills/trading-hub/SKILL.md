@@ -7,23 +7,52 @@ description: Unified entry point for 44 trading analysis skills. Browse by categ
 
 You are the Trading Hub — a unified entry point for 44 trading analysis skills organized into 4 preset workflows and 6 browsable categories.
 
+## Step 0: Load Custom Workflows
+
+Before presenting the menu, check if `~/.claude/trading-workflows.yaml` exists. If it does, read it using the `Read` tool. The file format is:
+
+```yaml
+workflows:
+  - name: "我的选股流"
+    description: "VCP筛选 → 深度分析 → 仓位计算"
+    steps:
+      - vcp-screener
+      - us-stock-analysis
+      - position-sizer
+  - name: "A股晨间"
+    description: "概念追踪 → 信号扫描 → 自选股简报"
+    steps:
+      - ashare-concept-tracker
+      - ashare-signal-scanner
+      - ashare-watchlist-briefing
+```
+
+If the file doesn't exist or is empty, skip this step and proceed with the default menu only.
+
 ## Step 1: Present the Main Menu
 
-Use the `AskUserQuestion` tool to present these 10 options:
+Use the `AskUserQuestion` tool to present these options:
 
-**Workflows:**
+**Preset Workflows:**
 1. Morning Review — economic calendar → market news → breadth → sector → bubble detector
 2. Stock Screening — pick a screener → deep-dive candidates → position sizing
 3. Earnings Season — earnings calendar → pick company → earnings deep-dive → trade scoring
 4. Strategy Synthesis — 8 upstream skills → Druckenmiller synthesizer → conviction score
 
+**Custom Workflows (if any loaded from Step 0):**
+Show each custom workflow as an additional numbered option with its name and description.
+
 **Browse by Category:**
-5. Macro & Regime (5 skills)
-6. Market Breadth & Timing (5 skills)
-7. Stock Screening (10 skills)
-8. Stock Analysis & Reports (9 skills)
-9. Strategy & Execution (10 skills)
-10. A 股分析 (5 skills)
+- Macro & Regime (5 skills)
+- Market Breadth & Timing (5 skills)
+- Stock Screening (10 skills)
+- Stock Analysis & Reports (9 skills)
+- Strategy & Execution (10 skills)
+- A 股分析 (5 skills)
+
+**Manage:**
+- Save New Workflow — create and save a custom workflow
+- Delete Workflow — remove an existing custom workflow
 
 ## Step 2: Handle Selection
 
@@ -75,7 +104,36 @@ After the final skill, provide a consolidated morning briefing summary.
 3. Run any selected optional screeners.
 4. Invoke `stanley-druckenmiller-investment` via `Skill` tool to synthesize all upstream data into a 0-100 conviction score.
 
-### Category Browse (Options 5-10)
+### Custom Workflow Execution
+
+If the user selects a custom workflow loaded from `~/.claude/trading-workflows.yaml`:
+
+1. Execute each skill in the `steps` array sequentially via `Skill` tool
+2. After each step, briefly summarize the output and ask "Continue to next step or stop?"
+3. After the final step, provide a consolidated summary
+
+### Save New Workflow
+
+If the user selects "Save New Workflow":
+
+1. Use `AskUserQuestion` to ask for the workflow name
+2. Use `AskUserQuestion` to ask which skills to include (show the full skill registry, allow multiple selection)
+3. Ask for a one-line description
+4. Write the workflow to `~/.claude/trading-workflows.yaml` using the `Write` tool:
+   - If file doesn't exist, create it with the `workflows:` key
+   - If file exists, read it first, then append the new workflow and write back
+   - Use the YAML format shown in Step 0
+
+### Delete Workflow
+
+If the user selects "Delete Workflow":
+
+1. Read `~/.claude/trading-workflows.yaml`
+2. Show existing custom workflows via `AskUserQuestion`
+3. Remove the selected workflow
+4. Write the updated file back
+
+### Category Browse
 
 When the user selects a category, show a Level 2 menu via `AskUserQuestion` listing all skills in that category. Use "name — description" as option labels.
 
