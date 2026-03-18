@@ -60,14 +60,15 @@ if [ ${#missing[@]} -gt 0 ]; then
   echo ""
 fi
 
-# Install trading-hub skill
-if [ -L "$SKILLS_DIR/trading-hub" ] || [ -d "$SKILLS_DIR/trading-hub" ]; then
-  echo "trading-hub skill already installed, updating symlink..."
-  rm -f "$SKILLS_DIR/trading-hub"
-fi
-
-ln -s "$SCRIPT_DIR/skills/trading-hub" "$SKILLS_DIR/trading-hub"
-echo "Installed: trading-hub -> $SKILLS_DIR/trading-hub"
+# Install all skills from this repo
+for skill_dir in "$SCRIPT_DIR/skills"/*/; do
+  skill_name=$(basename "$skill_dir")
+  if [ -L "$SKILLS_DIR/$skill_name" ] || [ -d "$SKILLS_DIR/$skill_name" ]; then
+    rm -f "$SKILLS_DIR/$skill_name"
+  fi
+  ln -s "$skill_dir" "$SKILLS_DIR/$skill_name"
+  echo "Installed: $skill_name"
+done
 
 # FMP API key check
 echo ""
