@@ -73,6 +73,39 @@ export FMP_API_KEY=your_key_here
 /trading-hub
 ```
 
+## Chat Panel（交互式终端）
+
+Catalog 页面右侧有一个 Chat 面板，通过 OpenClaw Gateway 连接到你的 Agent，实现网页内直接对话。
+
+### 配置 Agent 的 Trading Knowledge
+
+连接时会自动注入 trading context，但要获得最佳效果，建议将 trading knowledge 加入 Agent 的启动配置：
+
+**方式 1：新建 Trading Agent**
+
+在 `~/.openclaw/openclaw.json` 的 `agents.list` 中加入：
+```json
+{
+  "id": "trader",
+  "name": "Trading Assistant",
+  "workspace": "/path/to/your/workspace",
+  "bootstrap": ["./agents/AGENTS.md"]
+}
+```
+
+然后将本 repo 的 `agents/AGENTS.md` 复制到 workspace 目录。
+
+**方式 2：注入已有 Agent**
+
+将 `agents/AGENTS.md` 的内容追加到你现有 Agent 的 bootstrap 文件中（如 AGENTS.md 或 TOOLS.md）。Agent 重启后即获得 trading skills 导航能力。
+
+**Chat Panel 功能：**
+- 连接 OpenClaw Gateway（需要 token）
+- 自动注入 trading context
+- A 股分析：Agent 直接调用本地 API 返回真实数据
+- 美股分析：Agent 推荐具体的 Claude Code skill 并给出运行命令
+- 点击左侧工作流行 → 自动发送到 Chat 执行
+
 ## 功能一览
 
 | 功能 | 说明 | 状态 |
