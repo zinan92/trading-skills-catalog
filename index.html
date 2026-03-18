@@ -156,50 +156,67 @@
       margin-bottom: 1.5rem;
     }
 
-    .dep-graph svg {
-      max-width: 100%;
-      height: auto;
+    .workflow-panorama {
+      text-align: left;
+      max-width: 900px;
+      margin: 0 auto;
     }
 
-    .graph-node rect {
-      fill: #FFFFFF;
-      stroke: #E5E7EB;
-      stroke-width: 1.5;
-      transition: fill 0.2s, stroke 0.2s;
-      cursor: pointer;
+    .wf-row {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.5rem;
+      background: #FAFAFA;
+      border-radius: 8px;
+      border: 1px solid #E5E7EB;
+      transition: box-shadow 0.2s;
     }
 
-    .graph-node text {
+    .wf-row:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .wf-label {
+      min-width: 140px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: #1F2937;
+      flex-shrink: 0;
+    }
+
+    .wf-steps {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .wf-step {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
       font-family: ui-monospace, SFMono-Regular, monospace;
-      font-size: 11px;
-      fill: #1F2937;
-      pointer-events: none;
+      font-size: 0.75rem;
+      font-weight: 500;
+      white-space: nowrap;
     }
 
-    .graph-node:hover rect {
-      fill: #EFF6FF;
-      stroke: #3B82F6;
+    .wf-step.badge-free       { color: #10B981; background: #ECFDF5; }
+    .wf-step.badge-fmp        { color: #3B82F6; background: #EFF6FF; }
+    .wf-step.badge-websearch  { color: #F59E0B; background: #FFFBEB; }
+    .wf-step.badge-other      { color: #9CA3AF; background: #F3F4F6; }
+    .wf-step.badge-localapi   { color: #14B8A6; background: #F0FDFA; }
+
+    .wf-arrow {
+      color: #9CA3AF;
+      font-size: 0.85rem;
+      margin: 0 0.1rem;
     }
 
-    .graph-edge {
-      stroke: #D1D5DB;
-      stroke-width: 1.5;
-      fill: none;
-      transition: stroke 0.2s, stroke-width 0.2s;
-    }
-
-    .graph-edge.dashed {
-      stroke-dasharray: 6 4;
-    }
-
-    .graph-edge.highlighted {
-      stroke: #3B82F6;
-      stroke-width: 2.5;
-    }
-
-    .graph-node.highlighted rect {
-      fill: #EFF6FF;
-      stroke: #3B82F6;
+    @media (max-width: 640px) {
+      .wf-row { flex-direction: column; align-items: flex-start; }
+      .wf-label { margin-bottom: 0.5rem; }
     }
 
     /* ── Category Cards ── */
@@ -400,67 +417,74 @@
     <span><strong>4</strong> other</span>
   </div>
 
-  <!-- ════════ Dependency Graph ════════ -->
+  <!-- ════════ Workflow Panorama ════════ -->
   <div class="dep-graph">
     <div class="container">
-      <h2>Strategy Synthesizer — Dependency Graph</h2>
-      <p>How <code>stanley-druckenmiller-investment</code> aggregates upstream skill outputs</p>
+      <h2>Preset Workflows</h2>
+      <p>Each workflow chains multiple skills into a complete analysis pipeline. Run via <code>/trading-hub</code>.</p>
 
-      <svg viewBox="0 0 900 320" xmlns="http://www.w3.org/2000/svg" aria-label="Dependency graph showing stanley-druckenmiller-investment and its 8 upstream skills">
-        <!-- Edges (drawn first so nodes render on top) -->
-        <!-- Required edges (solid) -->
-        <line class="graph-edge" data-from="market-breadth" data-to="druckenmiller" x1="100" y1="140" x2="450" y2="60" />
-        <line class="graph-edge" data-from="uptrend" data-to="druckenmiller" x1="270" y1="140" x2="450" y2="60" />
-        <line class="graph-edge" data-from="market-top" data-to="druckenmiller" x1="440" y1="140" x2="450" y2="60" />
-        <line class="graph-edge" data-from="macro-regime" data-to="druckenmiller" x1="637" y1="140" x2="450" y2="60" />
-        <line class="graph-edge" data-from="ftd" data-to="druckenmiller" x1="800" y1="140" x2="450" y2="60" />
-        <!-- Optional edges (dashed) -->
-        <line class="graph-edge dashed" data-from="vcp" data-to="druckenmiller" x1="175" y1="260" x2="450" y2="60" />
-        <line class="graph-edge dashed" data-from="theme" data-to="druckenmiller" x1="450" y1="260" x2="450" y2="60" />
-        <line class="graph-edge dashed" data-from="canslim" data-to="druckenmiller" x1="720" y1="260" x2="450" y2="60" />
+      <div class="workflow-panorama">
 
-        <!-- Top node: Druckenmiller -->
-        <g class="graph-node" data-id="druckenmiller">
-          <rect x="295" y="20" width="310" height="40" rx="6" />
-          <text x="450" y="45" text-anchor="middle">stanley-druckenmiller-investment</text>
-        </g>
+        <div class="wf-row">
+          <div class="wf-label">Morning Review</div>
+          <div class="wf-steps">
+            <span class="wf-step badge-fmp">economic-calendar</span>
+            <span class="wf-arrow">&rarr;</span>
+            <span class="wf-step badge-websearch">market-news</span>
+            <span class="wf-arrow">&rarr;</span>
+            <span class="wf-step badge-free">market-breadth</span>
+            <span class="wf-arrow">&rarr;</span>
+            <span class="wf-step badge-free">sector-analyst</span>
+            <span class="wf-arrow">&rarr;</span>
+            <span class="wf-step badge-free">bubble-detector</span>
+          </div>
+        </div>
 
-        <!-- Required upstream row -->
-        <g class="graph-node" data-id="market-breadth">
-          <rect x="5" y="120" width="190" height="40" rx="6" />
-          <text x="100" y="145" text-anchor="middle">market-breadth-analyzer</text>
-        </g>
-        <g class="graph-node" data-id="uptrend">
-          <rect x="205" y="120" width="130" height="40" rx="6" />
-          <text x="270" y="145" text-anchor="middle">uptrend-analyzer</text>
-        </g>
-        <g class="graph-node" data-id="market-top">
-          <rect x="355" y="120" width="170" height="40" rx="6" />
-          <text x="440" y="145" text-anchor="middle">market-top-detector</text>
-        </g>
-        <g class="graph-node" data-id="macro-regime">
-          <rect x="545" y="120" width="185" height="40" rx="6" />
-          <text x="637" y="145" text-anchor="middle">macro-regime-detector</text>
-        </g>
-        <g class="graph-node" data-id="ftd">
-          <rect x="745" y="120" width="110" height="40" rx="6" />
-          <text x="800" y="145" text-anchor="middle">ftd-detector</text>
-        </g>
+        <div class="wf-row">
+          <div class="wf-label">Stock Screening</div>
+          <div class="wf-steps">
+            <span class="wf-step badge-fmp">canslim / vcp / theme</span>
+            <span class="wf-arrow">&rarr;</span>
+            <span class="wf-step badge-fmp">us-stock-analysis</span>
+            <span class="wf-arrow">&rarr;</span>
+            <span class="wf-step badge-free">position-sizer</span>
+          </div>
+        </div>
 
-        <!-- Optional upstream row -->
-        <g class="graph-node" data-id="vcp">
-          <rect x="105" y="240" width="140" height="40" rx="6" />
-          <text x="175" y="265" text-anchor="middle">vcp-screener</text>
-        </g>
-        <g class="graph-node" data-id="theme">
-          <rect x="375" y="240" width="150" height="40" rx="6" />
-          <text x="450" y="265" text-anchor="middle">theme-detector</text>
-        </g>
-        <g class="graph-node" data-id="canslim">
-          <rect x="640" y="240" width="160" height="40" rx="6" />
-          <text x="720" y="265" text-anchor="middle">canslim-screener</text>
-        </g>
-      </svg>
+        <div class="wf-row">
+          <div class="wf-label">Earnings Season</div>
+          <div class="wf-steps">
+            <span class="wf-step badge-fmp">earnings-calendar</span>
+            <span class="wf-arrow">&rarr;</span>
+            <span class="wf-step badge-websearch">tech-earnings-deepdive</span>
+            <span class="wf-arrow">&rarr;</span>
+            <span class="wf-step badge-fmp">earnings-trade-analyzer</span>
+          </div>
+        </div>
+
+        <div class="wf-row">
+          <div class="wf-label">Strategy Synthesis</div>
+          <div class="wf-steps">
+            <span class="wf-step badge-free">breadth + uptrend + top + regime + ftd</span>
+            <span class="wf-arrow">&rarr;</span>
+            <span class="wf-step badge-other">druckenmiller (0-100)</span>
+          </div>
+        </div>
+
+        <div class="wf-row">
+          <div class="wf-label">A 股复盘</div>
+          <div class="wf-steps">
+            <span class="wf-step badge-localapi">daily-review</span>
+            <span class="wf-arrow">&rarr;</span>
+            <span class="wf-step badge-localapi">concept-tracker</span>
+            <span class="wf-arrow">&rarr;</span>
+            <span class="wf-step badge-localapi">signal-scanner</span>
+            <span class="wf-arrow">&rarr;</span>
+            <span class="wf-step badge-localapi">watchlist-briefing</span>
+          </div>
+        </div>
+
+      </div>
     </div>
   </div>
 
@@ -1069,33 +1093,7 @@ export FMP_API_KEY=your_key_here</code></pre>
         });
       });
 
-      // (b) SVG hover highlight for dependency graph
-      var nodes = document.querySelectorAll('.graph-node');
-      var edges = document.querySelectorAll('.graph-edge');
-
-      nodes.forEach(function (node) {
-        var nodeId = node.getAttribute('data-id');
-
-        node.addEventListener('mouseenter', function () {
-          node.classList.add('highlighted');
-          edges.forEach(function (edge) {
-            var from = edge.getAttribute('data-from');
-            var to = edge.getAttribute('data-to');
-            if (from === nodeId || to === nodeId) {
-              edge.classList.add('highlighted');
-              // Also highlight the connected node
-              var connectedId = from === nodeId ? to : from;
-              var connectedNode = document.querySelector('.graph-node[data-id="' + connectedId + '"]');
-              if (connectedNode) connectedNode.classList.add('highlighted');
-            }
-          });
-        });
-
-        node.addEventListener('mouseleave', function () {
-          nodes.forEach(function (n) { n.classList.remove('highlighted'); });
-          edges.forEach(function (e) { e.classList.remove('highlighted'); });
-        });
-      });
+      // (b) No SVG graph — workflow panorama is pure CSS, no JS needed
     })();
   </script>
 
