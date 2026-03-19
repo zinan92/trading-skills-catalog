@@ -67,6 +67,37 @@
     }
     @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
 
+    /* Thinking indicator */
+    .msg.thinking {
+      align-self: flex-start; background: var(--surface); border: 1px solid var(--border);
+      border-bottom-left-radius: 4px; padding: 0.6rem 1rem; font-size: 0.85rem; color: var(--text-dim);
+    }
+    .thinking-dots::after {
+      content: ''; animation: dots 1.4s infinite;
+    }
+    @keyframes dots {
+      0% { content: '.'; } 33% { content: '..'; } 66% { content: '...'; }
+    }
+
+    /* Copy button */
+    .msg.assistant { position: relative; }
+    .copy-btn {
+      position: absolute; top: 0.4rem; right: 0.4rem;
+      padding: 0.2rem 0.5rem; border: 1px solid var(--border); border-radius: 4px;
+      background: var(--bg); color: var(--text-dim); font-size: 0.7rem;
+      cursor: pointer; opacity: 0; transition: opacity 0.15s;
+    }
+    .msg.assistant:hover .copy-btn { opacity: 1; }
+    .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .copy-btn.copied { color: var(--green); border-color: var(--green); }
+
+    /* Timestamp */
+    .msg-time {
+      font-size: 0.65rem; color: var(--text-dim); opacity: 0.5;
+      margin-top: 0.3rem; text-align: right;
+    }
+    .msg.assistant .msg-time { text-align: left; }
+
     /* Markdown rendered content */
     .msg.assistant { white-space: normal; }
     .msg.assistant h1, .msg.assistant h2, .msg.assistant h3 {
@@ -356,9 +387,54 @@
         var div = document.createElement('div');
         div.className = 'msg ' + role;
         div.textContent = text;
+
+        // Timestamp
+        if (role === 'user' || role === 'assistant') {
+          var time = document.createElement('div');
+          time.className = 'msg-time';
+          var now = new Date();
+          time.textContent = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+          div.appendChild(time);
+        }
+
+        // Copy button for assistant messages
+        if (role === 'assistant') {
+          var copyBtn = document.createElement('button');
+          copyBtn.className = 'copy-btn';
+          copyBtn.textContent = 'Copy';
+          copyBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var content = div.textContent.replace(/^Copy/, '').replace(/\d{2}:\d{2}$/, '').trim();
+            navigator.clipboard.writeText(content).then(function() {
+              copyBtn.textContent = 'Copied!';
+              copyBtn.classList.add('copied');
+              setTimeout(function() { copyBtn.textContent = 'Copy'; copyBtn.classList.remove('copied'); }, 1500);
+            });
+          });
+          div.appendChild(copyBtn);
+        }
+
         messagesEl.appendChild(div);
         messagesEl.scrollTop = messagesEl.scrollHeight;
         return div;
+      }
+
+      function addThinking() {
+        var div = document.createElement('div');
+        div.className = 'msg thinking';
+        div.id = 'thinkingIndicator';
+        var span = document.createElement('span');
+        span.className = 'thinking-dots';
+        span.textContent = '\u2728 \u601D\u8003\u4E2D';
+        div.appendChild(span);
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return div;
+      }
+
+      function removeThinking() {
+        var el = document.getElementById('thinkingIndicator');
+        if (el) el.remove();
       }
 
       function buildUserProfile() {
@@ -379,8 +455,7 @@
         sendBtn.disabled = true;
         state.streaming = true;
 
-        state.currentMsg = addMsg('assistant', '');
-        state.currentMsg.classList.add('streaming');
+        addThinking();
 
         fetch('/api/chat', {
           method: 'POST',
@@ -424,22 +499,29 @@
                 try {
                   var data = JSON.parse(line.slice(6));
                   if (data.type === 'text') {
+                    if (!state.currentMsg) {
+                      removeThinking();
+                      state.currentMsg = addMsg('assistant', '');
+                      state.currentMsg.classList.add('streaming');
+                    }
                     fullText += data.text;
                     scheduleRender();
                   } else if (data.type === 'done') {
                     if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
                     finish(fullText);
                   } else if (data.type === 'error') {
+                    removeThinking();
+                    if (!state.currentMsg) state.currentMsg = addMsg('assistant', '');
                     state.currentMsg.textContent = parseError(data.error);
                     finish('');
                   }
                 } catch(e) {}
               });
               read();
-            }).catch(function(err) { state.currentMsg.textContent = parseError(err.message); finish(''); });
+            }).catch(function(err) { removeThinking(); if (!state.currentMsg) state.currentMsg = addMsg('assistant',''); state.currentMsg.textContent = parseError(err.message); finish(''); });
           }
           read();
-        }).catch(function(err) { state.currentMsg.textContent = parseError(err.message); finish(''); });
+        }).catch(function(err) { removeThinking(); if (!state.currentMsg) state.currentMsg = addMsg('assistant',''); state.currentMsg.textContent = parseError(err.message); finish(''); });
       }
 
       function autoScroll() {
@@ -482,6 +564,7 @@
         state.currentMsg = null;
         state.streaming = false;
         sendBtn.disabled = !inputEl.value.trim();
+        inputEl.focus();
       }
 
       function saveHistory() {
