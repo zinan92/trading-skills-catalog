@@ -399,9 +399,23 @@
           var buffer = '';
           var fullText = '';
 
+          var renderTimer = null;
+
+          function scheduleRender() {
+            // Throttle markdown re-renders to every 300ms during streaming
+            if (renderTimer) return;
+            renderTimer = setTimeout(function() {
+              renderTimer = null;
+              if (state.currentMsg && fullText) {
+                renderMarkdown(state.currentMsg, fullText);
+                autoScroll();
+              }
+            }, 300);
+          }
+
           function read() {
             reader.read().then(function(result) {
-              if (result.done) { finish(fullText); return; }
+              if (result.done) { if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; } finish(fullText); return; }
               buffer += decoder.decode(result.value, { stream: true });
               var lines = buffer.split('\n');
               buffer = lines.pop();
@@ -411,20 +425,41 @@
                   var data = JSON.parse(line.slice(6));
                   if (data.type === 'text') {
                     fullText += data.text;
-                    state.currentMsg.textContent = fullText;
-                    messagesEl.scrollTop = messagesEl.scrollHeight;
-                  } else if (data.type === 'done') { finish(fullText); }
-                  else if (data.type === 'error') {
-                    state.currentMsg.textContent = 'Error: ' + data.error;
+                    scheduleRender();
+                  } else if (data.type === 'done') {
+                    if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
+                    finish(fullText);
+                  } else if (data.type === 'error') {
+                    state.currentMsg.textContent = parseError(data.error);
                     finish('');
                   }
                 } catch(e) {}
               });
               read();
-            }).catch(function(err) { state.currentMsg.textContent = 'Error: ' + err.message; finish(''); });
+            }).catch(function(err) { state.currentMsg.textContent = parseError(err.message); finish(''); });
           }
           read();
-        }).catch(function(err) { state.currentMsg.textContent = 'Error: ' + err.message; finish(''); });
+        }).catch(function(err) { state.currentMsg.textContent = parseError(err.message); finish(''); });
+      }
+
+      function autoScroll() {
+        // Only auto-scroll if user is near the bottom (within 150px)
+        var isNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 150;
+        if (isNearBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function parseError(raw) {
+        try {
+          var obj = JSON.parse(raw);
+          var msg = obj.error && obj.error.message ? obj.error.message : raw;
+          if (msg.indexOf('insufficient_balance') >= 0 || msg.indexOf('insufficient balance') >= 0) return 'API 余额不足，请充值或在 Settings 中切换到自己的 API Key。';
+          if (msg.indexOf('invalid api key') >= 0 || msg.indexOf('authorized_error') >= 0) return 'API Key 无效，请在 Settings 中检查。';
+          if (msg.indexOf('rate_limit') >= 0) return '请求太频繁，请稍后再试。';
+          return msg;
+        } catch(e) {
+          if (raw.indexOf('Failed to fetch') >= 0) return '无法连接服务器，请确认 server.py 正在运行。';
+          return raw;
+        }
       }
 
       function renderMarkdown(el, text) {
@@ -438,7 +473,10 @@
       function finish(fullText) {
         if (state.currentMsg) {
           state.currentMsg.classList.remove('streaming');
-          if (fullText) renderMarkdown(state.currentMsg, fullText);
+          if (fullText) {
+            renderMarkdown(state.currentMsg, fullText);
+            autoScroll();
+          }
         }
         if (fullText) { state.history.push({ role: 'assistant', content: fullText }); saveHistory(); }
         state.currentMsg = null;
