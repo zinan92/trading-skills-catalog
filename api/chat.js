@@ -1,12 +1,16 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
+const fs = require('fs');
+const path = require('path');
 
 let SYSTEM_PROMPT = 'You are a trading analysis assistant.';
 try {
-  SYSTEM_PROMPT = readFileSync(join(process.cwd(), 'app', 'prompts', 'SKILL.md'), 'utf-8');
+  SYSTEM_PROMPT = fs.readFileSync(path.join(process.cwd(), 'app', 'prompts', 'SKILL.md'), 'utf-8');
 } catch (e) {}
 
-export default async function handler(req, res) {
+function sanitizeError(msg) {
+  return (msg || 'Unknown error').replace(/sk-[a-zA-Z0-9_-]+/g, 'sk-***').replace(/Bearer [^\s"]+/g, 'Bearer ***');
+}
+
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -35,16 +39,12 @@ export default async function handler(req, res) {
     res.write('data: ' + JSON.stringify({ type: 'error', error: sanitizeError(e.message) }) + '\n\n');
     res.end();
   }
-}
+};
 
-function sanitizeError(msg) {
-  // Never expose API keys in error messages
-  return msg.replace(/sk-[a-zA-Z0-9_-]+/g, 'sk-***').replace(/Bearer [^\s"]+/g, 'Bearer ***');
-}
-}
+module.exports.config = { maxDuration: 60 };
 
 async function streamMinimax(system, messages, apiKey, res) {
-  if (!apiKey) { res.write('data: ' + JSON.stringify({ type: 'error', error: 'No MiniMax API key.' }) + '\n\n'); res.end(); return; }
+  if (!apiKey) { res.write('data: ' + JSON.stringify({ type: 'error', error: 'No MiniMax API key configured.' }) + '\n\n'); res.end(); return; }
 
   const body = JSON.stringify({
     model: 'MiniMax-M1',
@@ -61,7 +61,7 @@ async function streamMinimax(system, messages, apiKey, res) {
 
   if (!resp.ok) {
     const err = await resp.text();
-    res.write('data: ' + JSON.stringify({ type: 'error', error: err }) + '\n\n');
+    res.write('data: ' + JSON.stringify({ type: 'error', error: sanitizeError(err) }) + '\n\n');
     res.end();
     return;
   }
@@ -82,10 +82,10 @@ async function streamMinimax(system, messages, apiKey, res) {
       if (data === '[DONE]') { res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n'); continue; }
       try {
         const chunk = JSON.parse(data);
-        const delta = chunk.choices?.[0]?.delta;
-        if (delta?.content) res.write('data: ' + JSON.stringify({ type: 'text', text: delta.content }) + '\n\n');
-        if (chunk.choices?.[0]?.finish_reason) res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n');
-      } catch {}
+        const delta = chunk.choices && chunk.choices[0] && chunk.choices[0].delta;
+        if (delta && delta.content) res.write('data: ' + JSON.stringify({ type: 'text', text: delta.content }) + '\n\n');
+        if (chunk.choices && chunk.choices[0] && chunk.choices[0].finish_reason) res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n');
+      } catch (parseErr) {}
     }
   }
   res.end();
@@ -97,8 +97,8 @@ async function streamAnthropic(system, messages, apiKey, res) {
   const body = JSON.stringify({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 4096,
-    system,
-    messages,
+    system: system,
+    messages: messages,
     stream: true
   });
 
@@ -110,7 +110,7 @@ async function streamAnthropic(system, messages, apiKey, res) {
 
   if (!resp.ok) {
     const err = await resp.text();
-    res.write('data: ' + JSON.stringify({ type: 'error', error: err }) + '\n\n');
+    res.write('data: ' + JSON.stringify({ type: 'error', error: sanitizeError(err) }) + '\n\n');
     res.end();
     return;
   }
@@ -131,16 +131,13 @@ async function streamAnthropic(system, messages, apiKey, res) {
       if (data === '[DONE]') { res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n'); continue; }
       try {
         const event = JSON.parse(data);
-        if (event.type === 'content_block_delta') {
-          const text = event.delta?.text;
-          if (text) res.write('data: ' + JSON.stringify({ type: 'text', text }) + '\n\n');
+        if (event.type === 'content_block_delta' && event.delta && event.delta.text) {
+          res.write('data: ' + JSON.stringify({ type: 'text', text: event.delta.text }) + '\n\n');
         } else if (event.type === 'message_stop') {
           res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n');
         }
-      } catch {}
+      } catch (parseErr) {}
     }
   }
   res.end();
 }
-
-export const config = { maxDuration: 60 };
