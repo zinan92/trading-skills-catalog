@@ -71,7 +71,7 @@ async def _stream_minimax(system, messages, api_key, model):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
     async def stream():
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=120, verify=False) as client:
             async with client.stream("POST", MINIMAX_URL, json=payload, headers=headers) as resp:
                 if resp.status_code != 200:
                     error = await resp.aread()
@@ -108,7 +108,7 @@ async def _stream_anthropic(system, messages, api_key, model):
     headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
 
     async def stream():
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=120, verify=False) as client:
             async with client.stream("POST", ANTHROPIC_URL, json=payload, headers=headers) as resp:
                 if resp.status_code != 200:
                     error = await resp.aread()
