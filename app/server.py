@@ -36,6 +36,11 @@ KNOWN_US_TICKERS = [
 ]
 
 
+def _status_event(step: str, label: str, state: str) -> str:
+    """Format a status SSE event string."""
+    return f"data: {json.dumps({'type': 'status', 'step': step, 'label': label, 'state': state})}\n\n"
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     return HTMLResponse((Path(__file__).parent / "index.html").read_text())
@@ -58,103 +63,237 @@ async def chat(request: Request):
     user_profile = body.get("user_profile", "")
     provider = body.get("provider", "minimax")
     user_api_key = body.get("api_key", "")
+    model = body.get("model", MINIMAX_MODEL if provider != "anthropic" else ANTHROPIC_MODEL)
+    api_key = user_api_key or (ANTHROPIC_API_KEY if provider == "anthropic" else MINIMAX_API_KEY)
 
-    # Build system prompt with user profile
-    system = SYSTEM_PROMPT
-    if user_profile:
-        system += f"\n\n## Current User Profile\n{user_profile}"
-
-    # Pre-fetch live market data
-    market_data = await fetch_market_context(user_message)
-    if market_data:
-        system += f"\n\n## Live Market Data (just fetched)\n{market_data}"
-
-    # Build messages
-    messages = [{"role": m["role"], "content": m["content"]} for m in history]
-    messages.append({"role": "user", "content": user_message})
-
-    if provider == "anthropic":
-        return await _stream_anthropic(system, messages, user_api_key or ANTHROPIC_API_KEY, body.get("model", ANTHROPIC_MODEL))
-    else:
-        return await _stream_minimax(system, messages, user_api_key or MINIMAX_API_KEY, body.get("model", MINIMAX_MODEL))
-
-
-async def _stream_minimax(system, messages, api_key, model):
+    # Validate API key early so we can return a proper error
     if not api_key:
+        if provider == "anthropic":
+            return JSONResponse({"error": "No Anthropic API key. Set it in Settings."}, status_code=400)
         return JSONResponse({"error": "No MiniMax API key configured."}, status_code=400)
 
-    full_messages = [{"role": "system", "content": system}] + messages
+    async def stream_with_status():
+        status_events: list[str] = []
 
+        # Phase 1: prefetch with status collection
+        market_data = await _fetch_with_status_collect(user_message, status_events)
+
+        # Flush all collected status events first
+        for evt in status_events:
+            yield evt
+
+        # Build system prompt
+        system = SYSTEM_PROMPT
+        if user_profile:
+            system += f"\n\n## Current User Profile\n{user_profile}"
+        if market_data:
+            system += f"\n\n## Live Market Data (just fetched)\n{market_data}"
+
+        # Signal that AI analysis is starting
+        yield _status_event("routing", "Analyzing with trading methodologies...", "done")
+
+        # Build messages
+        messages = [{"role": m["role"], "content": m["content"]} for m in history]
+        messages.append({"role": "user", "content": user_message})
+
+        # Phase 2: stream AI response
+        if provider == "anthropic":
+            async for chunk in _gen_anthropic(system, messages, api_key, model):
+                yield chunk
+        else:
+            async for chunk in _gen_minimax(system, messages, api_key, model):
+                yield chunk
+
+    return StreamingResponse(stream_with_status(), media_type="text/event-stream")
+
+
+# ── AI streaming generators ──
+
+
+async def _gen_minimax(system: str, messages: list, api_key: str, model: str):
+    """Async generator yielding SSE strings from MiniMax."""
+    full_messages = [{"role": "system", "content": system}] + messages
     payload = {"model": model, "messages": full_messages, "stream": True, "max_tokens": 4096, "tools": []}
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
-    async def stream():
-        async with httpx.AsyncClient(timeout=120, verify=False) as client:
-            async with client.stream("POST", MINIMAX_URL, json=payload, headers=headers) as resp:
-                if resp.status_code != 200:
-                    error = await resp.aread()
-                    yield f"data: {json.dumps({'type': 'error', 'error': error.decode()})}\n\n"
+    async with httpx.AsyncClient(timeout=120, verify=False) as client:
+        async with client.stream("POST", MINIMAX_URL, json=payload, headers=headers) as resp:
+            if resp.status_code != 200:
+                error = await resp.aread()
+                yield f"data: {json.dumps({'type': 'error', 'error': error.decode()})}\n\n"
+                return
+            async for line in resp.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                data = line[6:]
+                if data == "[DONE]":
+                    yield f"data: {json.dumps({'type': 'done'})}\n\n"
                     return
-                async for line in resp.aiter_lines():
-                    if not line.startswith("data: "):
-                        continue
-                    data = line[6:]
-                    if data == "[DONE]":
-                        yield f"data: {json.dumps({'type': 'done'})}\n\n"
-                        return
-                    try:
-                        chunk = json.loads(data)
-                        choices = chunk.get("choices", [])
-                        if choices:
-                            delta = choices[0].get("delta", {})
-                            text = delta.get("content", "")
-                            if text:
-                                yield f"data: {json.dumps({'type': 'text', 'text': text})}\n\n"
-                            if choices[0].get("finish_reason"):
-                                yield f"data: {json.dumps({'type': 'done'})}\n\n"
-                    except json.JSONDecodeError:
-                        pass
-
-    return StreamingResponse(stream(), media_type="text/event-stream")
+                try:
+                    chunk = json.loads(data)
+                    choices = chunk.get("choices", [])
+                    if choices:
+                        delta = choices[0].get("delta", {})
+                        text = delta.get("content", "")
+                        if text:
+                            yield f"data: {json.dumps({'type': 'text', 'text': text})}\n\n"
+                        if choices[0].get("finish_reason"):
+                            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                except json.JSONDecodeError:
+                    pass
 
 
-async def _stream_anthropic(system, messages, api_key, model):
-    if not api_key:
-        return JSONResponse({"error": "No Anthropic API key. Set it in Settings."}, status_code=400)
-
+async def _gen_anthropic(system: str, messages: list, api_key: str, model: str):
+    """Async generator yielding SSE strings from Anthropic."""
     payload = {"model": model, "max_tokens": 4096, "system": system, "messages": messages, "stream": True}
     headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
 
-    async def stream():
-        async with httpx.AsyncClient(timeout=120, verify=False) as client:
-            async with client.stream("POST", ANTHROPIC_URL, json=payload, headers=headers) as resp:
-                if resp.status_code != 200:
-                    error = await resp.aread()
-                    yield f"data: {json.dumps({'type': 'error', 'error': error.decode()})}\n\n"
+    async with httpx.AsyncClient(timeout=120, verify=False) as client:
+        async with client.stream("POST", ANTHROPIC_URL, json=payload, headers=headers) as resp:
+            if resp.status_code != 200:
+                error = await resp.aread()
+                yield f"data: {json.dumps({'type': 'error', 'error': error.decode()})}\n\n"
+                return
+            async for line in resp.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                data = line[6:]
+                if data == "[DONE]":
+                    yield f"data: {json.dumps({'type': 'done'})}\n\n"
                     return
-                async for line in resp.aiter_lines():
-                    if not line.startswith("data: "):
-                        continue
-                    data = line[6:]
-                    if data == "[DONE]":
+                try:
+                    event = json.loads(data)
+                    if event.get("type") == "content_block_delta":
+                        text = event.get("delta", {}).get("text", "")
+                        if text:
+                            yield f"data: {json.dumps({'type': 'text', 'text': text})}\n\n"
+                    elif event.get("type") == "message_stop":
                         yield f"data: {json.dumps({'type': 'done'})}\n\n"
-                        return
-                    try:
-                        event = json.loads(data)
-                        if event.get("type") == "content_block_delta":
-                            text = event.get("delta", {}).get("text", "")
-                            if text:
-                                yield f"data: {json.dumps({'type': 'text', 'text': text})}\n\n"
-                        elif event.get("type") == "message_stop":
-                            yield f"data: {json.dumps({'type': 'done'})}\n\n"
-                    except json.JSONDecodeError:
-                        pass
-
-    return StreamingResponse(stream(), media_type="text/event-stream")
+                except json.JSONDecodeError:
+                    pass
 
 
-# ── Market data pre-fetching ──
-# Priority: quant-data-pipeline (localhost:8000) → no fallback (local only)
+# ── Market data pre-fetching with status events ──
+
+
+async def _fetch_with_status_collect(message: str, events: list[str]) -> str | None:
+    """
+    Fetch live market data and collect status SSE events into `events`.
+    Returns the formatted market data string (or None).
+    """
+    lines: list[str] = []
+    pipeline_ok = False
+
+    # 1. US market summary (always try)
+    events.append(_status_event("fetch_indexes", "Fetching market data from pipeline...", "running"))
+    us_summary = await _pipeline_get("/api/us-stock/summary")
+    if us_summary and us_summary.get("indexes"):
+        pipeline_ok = True
+        # Build a compact label from the first index
+        first = us_summary["indexes"][0]
+        name = first.get("cn_name") or first.get("name", "Index")
+        price = first.get("price", "")
+        pct = f"{first['change_pct']:+.2f}%" if first.get("change_pct") is not None else ""
+        events.append(_status_event("fetch_indexes", f"US Market: {name} {price} ({pct})", "done"))
+
+        lines.append("## US Market (Live from quant-data-pipeline)")
+        lines.append("| Index | Price | Change% | Volume |")
+        lines.append("|-------|-------|---------|--------|")
+        for idx in us_summary["indexes"]:
+            iname = idx.get("cn_name") or idx.get("name", "-")
+            iprice = idx.get("price", "-")
+            ipct = f"{idx['change_pct']:.2f}%" if idx.get("change_pct") is not None else "-"
+            ivol = f"{idx['volume']/1e9:.1f}B" if idx.get("volume") else "-"
+            lines.append(f"| {iname} | {iprice} | {ipct} | {ivol} |")
+        lines.append("")
+    else:
+        events.append(_status_event("fetch_indexes", "Market data unavailable (pipeline offline)", "done"))
+
+    # 2. Specific US stock quotes if mentioned
+    tickers = _extract_us_tickers(message)
+    if tickers and pipeline_ok:
+        events.append(_status_event("fetch_quotes", f"Fetching quotes: {', '.join(tickers)}...", "running"))
+        quotes = []
+        for ticker in tickers:
+            q = await _pipeline_get(f"/api/us-stock/quote/{ticker}", timeout=3.0)
+            if q and q.get("price"):
+                quotes.append(q)
+        if quotes:
+            events.append(_status_event("fetch_quotes", f"Got {len(quotes)} quote(s)", "done"))
+            lines.append("## Stock Quotes (Live)")
+            lines.append("| Symbol | Name | Price | Change% | Volume | Market Cap | PE |")
+            lines.append("|--------|------|-------|---------|--------|-----------|-----|")
+            for q in quotes:
+                sym = q.get("symbol", "-")
+                qname = q.get("cn_name") or q.get("name", "-")
+                qprice = f"${q['price']}"
+                qpct = f"{q['change_pct']:.2f}%" if q.get("change_pct") is not None else "-"
+                qvol = f"{q['volume']/1e6:.1f}M" if q.get("volume") else "-"
+                qmcap = f"${q['market_cap']/1e9:.1f}B" if q.get("market_cap") else "-"
+                qpe = f"{q['pe_ratio']:.1f}" if q.get("pe_ratio") else "-"
+                lines.append(f"| {sym} | {qname} | {qprice} | {qpct} | {qvol} | {qmcap} | {qpe} |")
+            lines.append("")
+        else:
+            events.append(_status_event("fetch_quotes", "No quote data returned", "done"))
+
+    # 3. A-share data if query is about A-shares
+    if _is_ashare_query(message) and pipeline_ok:
+        events.append(_status_event("fetch_ashare", "Fetching A-share data...", "running"))
+        fetched_ashare = False
+
+        concepts = await _pipeline_get("/api/concept-monitor/top")
+        if concepts and isinstance(concepts, list):
+            fetched_ashare = True
+            lines.append("## A股热门概念 (Live)")
+            lines.append("| 概念 | 涨幅 | 代表股 |")
+            lines.append("|------|------|--------|")
+            for c in concepts[:10]:
+                cname = c.get("name") or c.get("concept", "-")
+                cpct = f"{c['change_pct']:.2f}%" if c.get("change_pct") is not None else "-"
+                ctop = c.get("top_stock", "-")
+                lines.append(f"| {cname} | {cpct} | {ctop} |")
+            lines.append("")
+
+        anomaly = await _pipeline_get("/api/anomaly/scan")
+        if anomaly and (anomaly.get("limit_up") or anomaly.get("results")):
+            fetched_ashare = True
+            lines.append("## A股异常信号 (Live)")
+            lines.append(json.dumps(anomaly, ensure_ascii=False)[:500])
+            lines.append("")
+
+        rotation = await _pipeline_get("/api/rotation/signals")
+        if rotation:
+            fetched_ashare = True
+            lines.append("## 板块轮动信号 (Live)")
+            lines.append(json.dumps(rotation, ensure_ascii=False)[:500])
+            lines.append("")
+
+        label = "A-share data loaded" if fetched_ashare else "A-share data unavailable"
+        events.append(_status_event("fetch_ashare", label, "done"))
+
+    # 4. News/intel if available
+    events.append(_status_event("fetch_news", "Fetching latest news...", "running"))
+    news = await _pipeline_get("/api/news/latest?limit=5", timeout=3.0)
+    if news and isinstance(news, list) and len(news) > 0:
+        events.append(_status_event("fetch_news", f"{len(news)} news items loaded", "done"))
+        lines.append("## Latest News")
+        for n in news[:5]:
+            headline = n.get("title") or n.get("headline") or json.dumps(n, ensure_ascii=False)[:100]
+            lines.append(f"- {headline}")
+        lines.append("")
+    else:
+        events.append(_status_event("fetch_news", "No news available", "done"))
+
+    if lines:
+        now = datetime.now(timezone.utc).isoformat()
+        lines.insert(0, f"Data fetched at: {now}")
+        lines.append("IMPORTANT: Use this REAL live data in your analysis. These are actual market prices right now.")
+        return "\n".join(lines)
+
+    return None
+
+
+# ── Pipeline helpers ──
 
 
 async def _pipeline_get(path: str, timeout: float = 4.0):
@@ -177,8 +316,8 @@ def _extract_us_tickers(msg: str) -> list[str]:
     dollar_matches = re.findall(r"\$([A-Z]{1,5})", msg)
     tickers.extend(dollar_matches)
     # Deduplicate, limit to 5
-    seen = set()
-    result = []
+    seen: set[str] = set()
+    result: list[str] = []
     for t in tickers:
         if t not in seen:
             seen.add(t)
@@ -188,93 +327,6 @@ def _extract_us_tickers(msg: str) -> list[str]:
 
 def _is_ashare_query(msg: str) -> bool:
     return bool(re.search(r"A股|a股|沪深|创业板|涨停|跌停|板块|概念|茅台|宁德|上证|深证|科创板|港股通", msg))
-
-
-async def fetch_market_context(message: str) -> str | None:
-    """Fetch live market data from quant-data-pipeline to inject into system prompt."""
-    lines: list[str] = []
-    pipeline_ok = False
-
-    # 1. US market summary (always try)
-    us_summary = await _pipeline_get("/api/us-stock/summary")
-    if us_summary and us_summary.get("indexes"):
-        pipeline_ok = True
-        lines.append("## US Market (Live from quant-data-pipeline)")
-        lines.append("| Index | Price | Change% | Volume |")
-        lines.append("|-------|-------|---------|--------|")
-        for idx in us_summary["indexes"]:
-            name = idx.get("cn_name") or idx.get("name", "-")
-            price = idx.get("price", "-")
-            pct = f"{idx['change_pct']:.2f}%" if idx.get("change_pct") is not None else "-"
-            vol = f"{idx['volume']/1e9:.1f}B" if idx.get("volume") else "-"
-            lines.append(f"| {name} | {price} | {pct} | {vol} |")
-        lines.append("")
-
-    # 2. Specific US stock quotes if mentioned
-    tickers = _extract_us_tickers(message)
-    if tickers and pipeline_ok:
-        quotes = []
-        for ticker in tickers:
-            q = await _pipeline_get(f"/api/us-stock/quote/{ticker}", timeout=3.0)
-            if q and q.get("price"):
-                quotes.append(q)
-        if quotes:
-            lines.append("## Stock Quotes (Live)")
-            lines.append("| Symbol | Name | Price | Change% | Volume | Market Cap | PE |")
-            lines.append("|--------|------|-------|---------|--------|-----------|-----|")
-            for q in quotes:
-                sym = q.get("symbol", "-")
-                name = q.get("cn_name") or q.get("name", "-")
-                price = f"${q['price']}"
-                pct = f"{q['change_pct']:.2f}%" if q.get("change_pct") is not None else "-"
-                vol = f"{q['volume']/1e6:.1f}M" if q.get("volume") else "-"
-                mcap = f"${q['market_cap']/1e9:.1f}B" if q.get("market_cap") else "-"
-                pe = f"{q['pe_ratio']:.1f}" if q.get("pe_ratio") else "-"
-                lines.append(f"| {sym} | {name} | {price} | {pct} | {vol} | {mcap} | {pe} |")
-            lines.append("")
-
-    # 3. A-share data if query is about A-shares
-    if _is_ashare_query(message) and pipeline_ok:
-        concepts = await _pipeline_get("/api/concept-monitor/top")
-        if concepts and isinstance(concepts, list):
-            lines.append("## A股热门概念 (Live)")
-            lines.append("| 概念 | 涨幅 | 代表股 |")
-            lines.append("|------|------|--------|")
-            for c in concepts[:10]:
-                cname = c.get("name") or c.get("concept", "-")
-                cpct = f"{c['change_pct']:.2f}%" if c.get("change_pct") is not None else "-"
-                ctop = c.get("top_stock", "-")
-                lines.append(f"| {cname} | {cpct} | {ctop} |")
-            lines.append("")
-
-        anomaly = await _pipeline_get("/api/anomaly/scan")
-        if anomaly and (anomaly.get("limit_up") or anomaly.get("results")):
-            lines.append("## A股异常信号 (Live)")
-            lines.append(json.dumps(anomaly, ensure_ascii=False)[:500])
-            lines.append("")
-
-        rotation = await _pipeline_get("/api/rotation/signals")
-        if rotation:
-            lines.append("## 板块轮动信号 (Live)")
-            lines.append(json.dumps(rotation, ensure_ascii=False)[:500])
-            lines.append("")
-
-    # 4. News/intel if available
-    news = await _pipeline_get("/api/news/latest?limit=5", timeout=3.0)
-    if news and isinstance(news, list) and len(news) > 0:
-        lines.append("## Latest News")
-        for n in news[:5]:
-            headline = n.get("title") or n.get("headline") or json.dumps(n, ensure_ascii=False)[:100]
-            lines.append(f"- {headline}")
-        lines.append("")
-
-    if lines:
-        now = datetime.now(timezone.utc).isoformat()
-        lines.insert(0, f"Data fetched at: {now}")
-        lines.append("IMPORTANT: Use this REAL live data in your analysis. These are actual market prices right now.")
-        return "\n".join(lines)
-
-    return None
 
 
 if __name__ == "__main__":
