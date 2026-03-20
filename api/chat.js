@@ -23,6 +23,12 @@ module.exports = async function handler(req, res) {
   let system = SYSTEM_PROMPT;
   if (user_profile) system += '\n\n## Current User Profile\n' + user_profile;
 
+  // Pre-fetch market data based on user message
+  var marketData = await fetchMarketContext(message);
+  if (marketData) {
+    system += '\n\n## Live Market Data (just fetched)\n' + marketData;
+  }
+
   const messages = history.map(function(m) { return { role: m.role, content: m.content }; });
   messages.push({ role: 'user', content: message });
 
@@ -208,5 +214,55 @@ async function streamAnthropic(system, messages, apiKey, res) {
 
     request.write(payload);
     request.end();
+  });
+}
+
+// ── Market data pre-fetching ──
+
+function extractTickers(msg) {
+  var tickers = [];
+  var dollarMatch = msg.match(/\$([A-Z]{1,5})/g);
+  if (dollarMatch) tickers = tickers.concat(dollarMatch.map(function(t) { return t.slice(1); }));
+  var knownTickers = ['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','AMD','INTC','NFLX','CRM','ORCL','AVGO','QCOM','MU','TSM','ASML','ARM','PLTR','COIN','BABA','NIO','SPY','QQQ','IWM','GLD','TLT'];
+  knownTickers.forEach(function(t) {
+    if (msg.toUpperCase().indexOf(t) >= 0) tickers.push(t);
+  });
+  return tickers.filter(function(v, i, a) { return a.indexOf(v) === i; }).slice(0, 8);
+}
+
+function fetchMarketContext(message) {
+  return new Promise(function(resolve) {
+    var tickers = extractTickers(message);
+    var symbols = ['SPY','QQQ'].concat(tickers).filter(function(v,i,a) { return a.indexOf(v) === i; });
+    var https2 = require('https');
+    var opts = {
+      hostname: 'query1.finance.yahoo.com',
+      path: '/v7/finance/quote?symbols=' + encodeURIComponent(symbols.join(',')) + '&fields=symbol,shortName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,marketCap,trailingPE,forwardPE,fiftyTwoWeekHigh,fiftyTwoWeekLow,fiftyDayAverage,twoHundredDayAverage',
+      method: 'GET',
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    };
+    var req2 = https2.request(opts, function(resp2) {
+      var body = '';
+      resp2.on('data', function(c) { body += c; });
+      resp2.on('end', function() {
+        try {
+          var d = JSON.parse(body);
+          var quotes = (d.quoteResponse && d.quoteResponse.result) || [];
+          if (quotes.length === 0) { resolve(null); return; }
+          var lines = ['Real-time data fetched at ' + new Date().toISOString(), ''];
+          lines.push('| Symbol | Price | Change% | Volume | PE | 52W High | 52W Low | MA50 | MA200 |');
+          lines.push('|--------|-------|---------|--------|----|---------|---------|----- |-------|');
+          quotes.forEach(function(q) {
+            lines.push('| ' + q.symbol + ' | $' + (q.regularMarketPrice||'-') + ' | ' + (q.regularMarketChangePercent ? q.regularMarketChangePercent.toFixed(2)+'%' : '-') + ' | ' + (q.regularMarketVolume ? (q.regularMarketVolume/1e6).toFixed(1)+'M' : '-') + ' | ' + (q.trailingPE ? q.trailingPE.toFixed(1) : '-') + ' | $' + (q.fiftyTwoWeekHigh||'-') + ' | $' + (q.fiftyTwoWeekLow||'-') + ' | $' + (q.fiftyDayAverage ? q.fiftyDayAverage.toFixed(2) : '-') + ' | $' + (q.twoHundredDayAverage ? q.twoHundredDayAverage.toFixed(2) : '-') + ' |');
+          });
+          lines.push('');
+          lines.push('IMPORTANT: Use this REAL live data in your analysis. Do NOT make up prices.');
+          resolve(lines.join('\n'));
+        } catch(e) { resolve(null); }
+      });
+    });
+    req2.on('error', function() { resolve(null); });
+    req2.setTimeout(5000, function() { req2.destroy(); resolve(null); });
+    req2.end();
   });
 }

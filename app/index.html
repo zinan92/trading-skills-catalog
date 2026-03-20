@@ -234,8 +234,23 @@
     .msg.assistant tr:hover td { background: rgba(37,99,235,0.02); }
     .msg.assistant hr { border: none; border-top: 1px solid var(--border); margin: 0.8rem 0; }
     .msg.assistant blockquote {
-      border-left: 3px solid var(--accent); padding-left: 0.8rem;
-      color: var(--text-dim); margin: 0.4rem 0;
+      border-left: 3px solid var(--accent);
+      background: linear-gradient(135deg, rgba(37,99,235,0.04), rgba(37,99,235,0.01));
+      padding: 0.7rem 1rem;
+      border-radius: 0 10px 10px 0;
+      margin: 0.6rem 0;
+      color: var(--text);
+      font-size: 0.88rem;
+    }
+    .msg.assistant blockquote + blockquote {
+      margin-top: 0.4rem;
+    }
+    .msg.assistant blockquote strong {
+      color: var(--accent);
+      font-size: 0.9rem;
+    }
+    .msg.assistant blockquote p {
+      margin: 0.2rem 0;
     }
     .msg.assistant a { color: var(--accent); }
 
