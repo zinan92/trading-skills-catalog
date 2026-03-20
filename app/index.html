@@ -333,6 +333,18 @@
     .btn-secondary { background: var(--bg); color: var(--text-dim); border: 1px solid var(--border) !important; }
     .btn-danger { background: var(--red); color: white; }
 
+    /* ── Demo link ── */
+    .demo-link {
+      margin-top: 1.5rem;
+      background: none; border: none;
+      color: var(--text-dim); font-size: 0.82rem;
+      cursor: pointer; font-family: var(--font);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: color 0.15s;
+    }
+    .demo-link:hover { color: var(--accent); }
+
     @media (max-width: 640px) {
       .landing h1 { font-size: 1.8rem; }
       .msg { max-width: 95%; }
@@ -377,6 +389,8 @@
         <button class="quick-btn" data-prompt="帮我分析一下 NVDA 值不值得买入">📈 Analyze NVDA</button>
         <button class="quick-btn" data-prompt="本周有哪些重要公司发布财报？">📅 Earnings</button>
       </div>
+
+      <button class="demo-link" id="showDemo">See an example analysis &rarr;</button>
     </div>
 
     <!-- Chat view (after first message) -->
@@ -495,6 +509,24 @@
           landingInput.value = btn.getAttribute('data-prompt');
           doSend(landingInput);
         });
+      });
+
+      // Demo showcase — static pre-generated analysis, no API needed
+      var DEMO_QUESTION = '帮我分析一下 NVDA 值不值得买入';
+      var DEMO_ANSWER = '# NVDA 分析\n\n从技术面、基本面和市场环境三个维度拆解。\n\n---\n\n## 1. 财报体检\n\n| 指标 | 数据 | 评价 |\n|------|------|------|\n| 营收 YoY | +122% (数据中心) | 超级增长 |\n| 毛利率 | 75.5% | 极其优秀 |\n| EPS 增长 | +593% YoY | 爆发式 |\n| 自由现金流 | >$12B | 现金机器 |\n\n**关键点：**\n- **数据中心业务**已成绝对主力，AI 芯片需求处于超级周期\n- **毛利率**持续提升，定价权极强（Moat 够深）\n- **指引**：管理层对 AI 需求持续乐观\n\n---\n\n## 2. 估值 — 贵不贵？\n\n| 估值方式 | 数值 | 解读 |\n|----------|------|------|\n| Forward P/E | ~60x | 偏高但合理 |\n| PEG | <1 | 增长消化估值 |\n| P/S | ~25x | 科技巨头溢价 |\n\n**判断**：单纯看 PE 确实贵，但如果你相信 AI 是十年级别的大趋势，NVDA 的估值在科技成长股里属于**可接受范围**。\n\n---\n\n## 3. 技术形态\n\n- ✅ 股价处于 **Stage 2 上升趋势**（长期均线多头排列）\n- ⚠️ 近期有明显**回调**，从高点回撤约 15-20%\n- 📉 需要观察：是否形成**盘整基底**\n\n**关键价位：**\n- **支撑**：$850-900 区间\n- **止损**：跌破 $800 需警惕\n- **目标**：突破前高上看 $1200+\n\n---\n\n## 综合判断\n\n| 维度 | 评分 | 说明 |\n|------|------|------|\n| 基本面 | ⭐⭐⭐⭐⭐ | AI 周期核心标的 |\n| 估值 | ⭐⭐⭐ | 贵，但有增长支撑 |\n| 技术面 | ⭐⭐⭐⭐ | 上升趋势，回调中找机会 |\n| 仓位 | ⭐⭐⭐ | 取决于风险承受能力 |\n\n---\n\n## 行动建议\n\n| 情景 | 操作 | 条件 |\n|------|------|------|\n| **保守** | 等回调至 $850 以下分批建仓 | 跌破 $800 止损 |\n| **进取** | 现价 $950 附近轻仓试单 | 止损 $900（5%） |\n| **等待** | 等突破 $1050 再追 | 确认新一轮上涨 |\n\n**仓位建议：**\n- 单只股票不超过总仓位 **10-15%**\n- 分 3 批：30% 现价，30% 回调到 $900，30% 突破 $1050\n\n> **NVDA 基本面极其强劲，是 AI 赛道的核心资产。** 长期持有（2-3 年）可以开始定投式建仓。短线等更好的买点。';
+
+      document.getElementById('showDemo').addEventListener('click', function() {
+        enterChatMode();
+        addMsg('user', DEMO_QUESTION);
+        var el = addMsg('assistant', '');
+        renderMarkdown(el, DEMO_ANSWER);
+        // Add a subtle label
+        var label = document.createElement('div');
+        label.className = 'msg system';
+        label.textContent = 'This is a pre-generated example. Try asking your own question below.';
+        messagesEl.appendChild(label);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        chatInput.focus();
       });
 
       function enterChatMode() {
