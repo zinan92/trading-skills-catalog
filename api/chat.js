@@ -336,17 +336,15 @@ async function fetchMarketContext(message) {
   return fetchYahooFallback(message);
 }
 
-function fetchYahooFallback(message) {
-  var tickers = extractUSTickers(message);
-  var symbols = ['SPY','QQQ'].concat(tickers).filter(function(v,i,a) { return a.indexOf(v) === i; });
-
+// Yahoo v8 chart API — still works from servers (v7 quote API is deprecated)
+function fetchYahooQuote(symbol, timeout) {
   return new Promise(function(resolve) {
     var https2 = require('https');
     var opts = {
       hostname: 'query1.finance.yahoo.com',
-      path: '/v7/finance/quote?symbols=' + encodeURIComponent(symbols.join(',')) + '&fields=symbol,shortName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,trailingPE',
+      path: '/v8/finance/chart/' + encodeURIComponent(symbol) + '?range=5d&interval=1d&includePrePost=false',
       method: 'GET',
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TradingCopilot/1.0)' }
     };
     var req2 = https2.request(opts, function(resp2) {
       var body = '';
@@ -354,22 +352,72 @@ function fetchYahooFallback(message) {
       resp2.on('end', function() {
         try {
           var d = JSON.parse(body);
-          var quotes = (d.quoteResponse && d.quoteResponse.result) || [];
-          if (quotes.length === 0) { resolve(null); return; }
-          var lines = ['Yahoo Finance data at ' + new Date().toISOString(), ''];
-          lines.push('| Symbol | Price | Change% | PE |');
-          lines.push('|--------|-------|---------|----|');
-          quotes.forEach(function(q) {
-            lines.push('| ' + q.symbol + ' | $' + (q.regularMarketPrice||'-') + ' | ' + (q.regularMarketChangePercent ? q.regularMarketChangePercent.toFixed(2)+'%' : '-') + ' | ' + (q.trailingPE ? q.trailingPE.toFixed(1) : '-') + ' |');
+          var result = d.chart && d.chart.result && d.chart.result[0];
+          if (!result) { resolve(null); return; }
+          var meta = result.meta;
+          var closes = result.indicators.quote[0].close;
+          var prevClose = meta.chartPreviousClose || meta.previousClose;
+          var price = meta.regularMarketPrice;
+          var change = prevClose ? ((price - prevClose) / prevClose * 100) : null;
+          resolve({
+            symbol: meta.symbol,
+            name: meta.shortName || meta.longName || meta.symbol,
+            price: price,
+            change_pct: change,
+            volume: meta.regularMarketVolume || null,
+            market_cap: null
           });
-          lines.push('');
-          lines.push('IMPORTANT: Use this REAL data. Do NOT make up prices.');
-          resolve(lines.join('\n'));
         } catch(e) { resolve(null); }
       });
     });
     req2.on('error', function() { resolve(null); });
-    req2.setTimeout(4000, function() { req2.destroy(); resolve(null); });
+    req2.setTimeout(timeout || 4000, function() { req2.destroy(); resolve(null); });
     req2.end();
   });
+}
+
+async function fetchYahooFallback(message) {
+  var tickers = extractUSTickers(message);
+  // Always fetch index data + mentioned tickers
+  var indexSymbols = ['^GSPC', '^IXIC', '^DJI'];
+  var lines = [];
+
+  // Fetch indexes in parallel
+  var indexResults = await Promise.all(indexSymbols.map(function(s) { return fetchYahooQuote(s, 4000); }));
+  var indexNames = { '^GSPC': 'S&P 500', '^IXIC': 'NASDAQ', '^DJI': 'Dow Jones' };
+  var hasIndex = indexResults.some(function(r) { return r !== null; });
+
+  if (hasIndex) {
+    lines.push('## US Market Indexes (Live from Yahoo Finance)');
+    lines.push('| Index | Price | Change% |');
+    lines.push('|-------|-------|---------|');
+    indexResults.forEach(function(q) {
+      if (!q) return;
+      var name = indexNames[q.symbol] || q.name;
+      lines.push('| ' + name + ' | ' + q.price.toFixed(2) + ' | ' + (q.change_pct !== null ? q.change_pct.toFixed(2) + '%' : '-') + ' |');
+    });
+    lines.push('');
+  }
+
+  // Fetch specific stock quotes
+  if (tickers.length > 0) {
+    var stockResults = await Promise.all(tickers.map(function(t) { return fetchYahooQuote(t, 3000); }));
+    var validStocks = stockResults.filter(function(r) { return r !== null; });
+    if (validStocks.length > 0) {
+      lines.push('## Stock Quotes (Live from Yahoo Finance)');
+      lines.push('| Symbol | Name | Price | Change% |');
+      lines.push('|--------|------|-------|---------|');
+      validStocks.forEach(function(q) {
+        lines.push('| ' + q.symbol + ' | ' + q.name + ' | $' + q.price.toFixed(2) + ' | ' + (q.change_pct !== null ? q.change_pct.toFixed(2) + '%' : '-') + ' |');
+      });
+      lines.push('');
+    }
+  }
+
+  if (lines.length > 0) {
+    lines.unshift('Data fetched at: ' + new Date().toISOString());
+    lines.push('IMPORTANT: Use this REAL live data in your analysis. These are actual market prices. Do NOT make up different prices.');
+    return lines.join('\n');
+  }
+  return null;
 }
