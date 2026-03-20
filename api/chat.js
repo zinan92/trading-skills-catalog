@@ -218,26 +218,132 @@ async function streamAnthropic(system, messages, apiKey, res) {
 }
 
 // ── Market data pre-fetching ──
+// Priority: quant-data-pipeline (localhost:8000) → Yahoo Finance fallback
 
-function extractTickers(msg) {
-  var tickers = [];
-  var dollarMatch = msg.match(/\$([A-Z]{1,5})/g);
-  if (dollarMatch) tickers = tickers.concat(dollarMatch.map(function(t) { return t.slice(1); }));
-  var knownTickers = ['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','AMD','INTC','NFLX','CRM','ORCL','AVGO','QCOM','MU','TSM','ASML','ARM','PLTR','COIN','BABA','NIO','SPY','QQQ','IWM','GLD','TLT'];
-  knownTickers.forEach(function(t) {
-    if (msg.toUpperCase().indexOf(t) >= 0) tickers.push(t);
+var PIPELINE_BASE = process.env.PIPELINE_URL || 'http://localhost:8000';
+
+function httpGet(url, timeout) {
+  return new Promise(function(resolve) {
+    var mod = url.startsWith('https') ? require('https') : require('http');
+    var req = mod.get(url, { timeout: timeout || 4000 }, function(res) {
+      var body = '';
+      res.on('data', function(c) { body += c; });
+      res.on('end', function() {
+        try { resolve(JSON.parse(body)); } catch(e) { resolve(null); }
+      });
+    });
+    req.on('error', function() { resolve(null); });
+    req.on('timeout', function() { req.destroy(); resolve(null); });
   });
-  return tickers.filter(function(v, i, a) { return a.indexOf(v) === i; }).slice(0, 8);
 }
 
-function fetchMarketContext(message) {
+function extractUSTickers(msg) {
+  var tickers = [];
+  var upper = msg.toUpperCase();
+  var known = ['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','AMD','INTC','NFLX','CRM','ORCL','AVGO','QCOM','MU','TSM','ASML','ARM','PLTR','COIN','BABA','NIO','LI','XPEV','JD','PDD'];
+  known.forEach(function(t) { if (upper.indexOf(t) >= 0) tickers.push(t); });
+  var dollar = msg.match(/\$([A-Z]{1,5})/g);
+  if (dollar) tickers = tickers.concat(dollar.map(function(t) { return t.slice(1); }));
+  return tickers.filter(function(v,i,a) { return a.indexOf(v) === i; }).slice(0, 5);
+}
+
+function isAShareQuery(msg) {
+  return /[A股a股沪深创业板涨停跌停板块概念茅台宁德]/.test(msg);
+}
+
+async function fetchMarketContext(message) {
+  var lines = [];
+  var pipelineOk = false;
+
+  // 1. Try quant-data-pipeline for US market summary (always)
+  var usSummary = await httpGet(PIPELINE_BASE + '/api/us-stock/summary', 4000);
+  if (usSummary && usSummary.indexes) {
+    pipelineOk = true;
+    lines.push('## US Market (Live from quant-data-pipeline)');
+    lines.push('| Index | Price | Change% | Volume |');
+    lines.push('|-------|-------|---------|--------|');
+    usSummary.indexes.forEach(function(idx) {
+      lines.push('| ' + (idx.cn_name || idx.name) + ' | ' + idx.price + ' | ' + (idx.change_pct ? idx.change_pct.toFixed(2) + '%' : '-') + ' | ' + (idx.volume ? (idx.volume/1e9).toFixed(1) + 'B' : '-') + ' |');
+    });
+    lines.push('');
+  }
+
+  // 2. Fetch specific US stock quotes if mentioned
+  var tickers = extractUSTickers(message);
+  if (tickers.length > 0 && pipelineOk) {
+    var quotes = [];
+    for (var i = 0; i < tickers.length; i++) {
+      var q = await httpGet(PIPELINE_BASE + '/api/us-stock/quote/' + tickers[i], 3000);
+      if (q && q.price) quotes.push(q);
+    }
+    if (quotes.length > 0) {
+      lines.push('## Stock Quotes (Live)');
+      lines.push('| Symbol | Name | Price | Change% | Volume | Market Cap | PE |');
+      lines.push('|--------|------|-------|---------|--------|-----------|-----|');
+      quotes.forEach(function(q) {
+        lines.push('| ' + q.symbol + ' | ' + (q.cn_name || q.name) + ' | $' + q.price + ' | ' + (q.change_pct ? q.change_pct.toFixed(2) + '%' : '-') + ' | ' + (q.volume ? (q.volume/1e6).toFixed(1) + 'M' : '-') + ' | $' + (q.market_cap ? (q.market_cap/1e9).toFixed(1) + 'B' : '-') + ' | ' + (q.pe_ratio ? q.pe_ratio.toFixed(1) : '-') + ' |');
+      });
+      lines.push('');
+    }
+  }
+
+  // 3. A-share data if query is about A-shares
+  if (isAShareQuery(message) && pipelineOk) {
+    var concepts = await httpGet(PIPELINE_BASE + '/api/concept-monitor/top', 4000);
+    if (concepts && Array.isArray(concepts)) {
+      lines.push('## A股热门概念 (Live)');
+      lines.push('| 概念 | 涨幅 | 代表股 |');
+      lines.push('|------|------|--------|');
+      concepts.slice(0, 10).forEach(function(c) {
+        lines.push('| ' + (c.name || c.concept || '-') + ' | ' + (c.change_pct ? c.change_pct.toFixed(2) + '%' : '-') + ' | ' + (c.top_stock || '-') + ' |');
+      });
+      lines.push('');
+    }
+
+    var anomaly = await httpGet(PIPELINE_BASE + '/api/anomaly/scan', 4000);
+    if (anomaly && (anomaly.limit_up || anomaly.results)) {
+      lines.push('## A股异常信号 (Live)');
+      lines.push(JSON.stringify(anomaly).substring(0, 500));
+      lines.push('');
+    }
+
+    var rotation = await httpGet(PIPELINE_BASE + '/api/rotation/signals', 4000);
+    if (rotation) {
+      lines.push('## 板块轮动信号 (Live)');
+      lines.push(JSON.stringify(rotation).substring(0, 500));
+      lines.push('');
+    }
+  }
+
+  // 4. News/intel if available
+  var news = await httpGet(PIPELINE_BASE + '/api/news/latest?limit=5', 3000);
+  if (news && Array.isArray(news) && news.length > 0) {
+    lines.push('## Latest News');
+    news.slice(0, 5).forEach(function(n) {
+      lines.push('- ' + (n.title || n.headline || JSON.stringify(n).substring(0, 100)));
+    });
+    lines.push('');
+  }
+
+  if (lines.length > 0) {
+    lines.unshift('Data fetched at: ' + new Date().toISOString());
+    lines.push('IMPORTANT: Use this REAL live data in your analysis. These are actual market prices right now.');
+    return lines.join('\n');
+  }
+
+  // Fallback: Yahoo Finance (for Vercel deployment without pipeline access)
+  return fetchYahooFallback(message);
+}
+
+function fetchYahooFallback(message) {
+  var tickers = extractUSTickers(message);
+  var symbols = ['SPY','QQQ'].concat(tickers).filter(function(v,i,a) { return a.indexOf(v) === i; });
+
   return new Promise(function(resolve) {
-    var tickers = extractTickers(message);
-    var symbols = ['SPY','QQQ'].concat(tickers).filter(function(v,i,a) { return a.indexOf(v) === i; });
     var https2 = require('https');
     var opts = {
       hostname: 'query1.finance.yahoo.com',
-      path: '/v7/finance/quote?symbols=' + encodeURIComponent(symbols.join(',')) + '&fields=symbol,shortName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,marketCap,trailingPE,forwardPE,fiftyTwoWeekHigh,fiftyTwoWeekLow,fiftyDayAverage,twoHundredDayAverage',
+      path: '/v7/finance/quote?symbols=' + encodeURIComponent(symbols.join(',')) + '&fields=symbol,shortName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,trailingPE',
       method: 'GET',
       headers: { 'User-Agent': 'Mozilla/5.0' }
     };
@@ -249,20 +355,20 @@ function fetchMarketContext(message) {
           var d = JSON.parse(body);
           var quotes = (d.quoteResponse && d.quoteResponse.result) || [];
           if (quotes.length === 0) { resolve(null); return; }
-          var lines = ['Real-time data fetched at ' + new Date().toISOString(), ''];
-          lines.push('| Symbol | Price | Change% | Volume | PE | 52W High | 52W Low | MA50 | MA200 |');
-          lines.push('|--------|-------|---------|--------|----|---------|---------|----- |-------|');
+          var lines = ['Yahoo Finance data at ' + new Date().toISOString(), ''];
+          lines.push('| Symbol | Price | Change% | PE |');
+          lines.push('|--------|-------|---------|----|');
           quotes.forEach(function(q) {
-            lines.push('| ' + q.symbol + ' | $' + (q.regularMarketPrice||'-') + ' | ' + (q.regularMarketChangePercent ? q.regularMarketChangePercent.toFixed(2)+'%' : '-') + ' | ' + (q.regularMarketVolume ? (q.regularMarketVolume/1e6).toFixed(1)+'M' : '-') + ' | ' + (q.trailingPE ? q.trailingPE.toFixed(1) : '-') + ' | $' + (q.fiftyTwoWeekHigh||'-') + ' | $' + (q.fiftyTwoWeekLow||'-') + ' | $' + (q.fiftyDayAverage ? q.fiftyDayAverage.toFixed(2) : '-') + ' | $' + (q.twoHundredDayAverage ? q.twoHundredDayAverage.toFixed(2) : '-') + ' |');
+            lines.push('| ' + q.symbol + ' | $' + (q.regularMarketPrice||'-') + ' | ' + (q.regularMarketChangePercent ? q.regularMarketChangePercent.toFixed(2)+'%' : '-') + ' | ' + (q.trailingPE ? q.trailingPE.toFixed(1) : '-') + ' |');
           });
           lines.push('');
-          lines.push('IMPORTANT: Use this REAL live data in your analysis. Do NOT make up prices.');
+          lines.push('IMPORTANT: Use this REAL data. Do NOT make up prices.');
           resolve(lines.join('\n'));
         } catch(e) { resolve(null); }
       });
     });
     req2.on('error', function() { resolve(null); });
-    req2.setTimeout(5000, function() { req2.destroy(); resolve(null); });
+    req2.setTimeout(4000, function() { req2.destroy(); resolve(null); });
     req2.end();
   });
 }
