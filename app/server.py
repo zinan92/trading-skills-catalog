@@ -271,15 +271,56 @@ async def _fetch_with_status_collect(message: str, events: list[str]) -> str | N
         label = "A-share data loaded" if fetched_ashare else "A-share data unavailable"
         events.append(_status_event("fetch_ashare", label, "done"))
 
-    # 4. News/intel if available
+    # 4. Commodities + Bonds (macro context)
+    if pipeline_ok:
+        events.append(_status_event("fetch_macro", "Fetching commodities & bonds...", "running"))
+        macro_parts = []
+
+        commodities = await _pipeline_get("/api/us-stock/commodities", timeout=3.0)
+        if commodities and commodities.get("commodities"):
+            lines.append("## Commodities (Live)")
+            lines.append("| Asset | Price | Change% |")
+            lines.append("|-------|-------|---------|")
+            for c in commodities["commodities"][:6]:
+                cname = c.get("name", c.get("symbol", "-"))
+                cprice = f"${c['price']}" if c.get("price") else "-"
+                cpct = f"{c['change_pct']:+.2f}%" if c.get("change_pct") is not None else "-"
+                lines.append(f"| {cname} | {cprice} | {cpct} |")
+                macro_parts.append(f"{cname.split()[0]} {cpct}")
+            lines.append("")
+
+        bonds = await _pipeline_get("/api/us-stock/bonds", timeout=3.0)
+        if bonds and bonds.get("bonds"):
+            lines.append("## US Treasury Yields (Live)")
+            lines.append("| Maturity | Yield | Change% |")
+            lines.append("|----------|-------|---------|")
+            for b in bonds["bonds"]:
+                bname = b.get("name", b.get("symbol", "-"))
+                byield = f"{b['price']:.2f}%" if b.get("price") else "-"
+                bpct = f"{b['change_pct']:+.2f}%" if b.get("change_pct") is not None else "-"
+                lines.append(f"| {bname} | {byield} | {bpct} |")
+                macro_parts.append(f"{bname.split()[-2] if len(bname.split()) > 2 else bname} {byield}")
+            lines.append("")
+
+        label = ", ".join(macro_parts[:4]) if macro_parts else "Macro data unavailable"
+        events.append(_status_event("fetch_macro", label, "done"))
+
+    # 5. News
     events.append(_status_event("fetch_news", "Fetching latest news...", "running"))
-    news = await _pipeline_get("/api/news/latest?limit=5", timeout=3.0)
-    if news and isinstance(news, list) and len(news) > 0:
-        events.append(_status_event("fetch_news", f"{len(news)} news items loaded", "done"))
-        lines.append("## Latest News")
-        for n in news[:5]:
+    news_data = await _pipeline_get("/api/us-stock/news?limit=5", timeout=3.0)
+    news_items = []
+    if news_data and isinstance(news_data, dict):
+        news_items = news_data.get("news", [])
+    elif news_data and isinstance(news_data, list):
+        news_items = news_data
+
+    if news_items:
+        events.append(_status_event("fetch_news", f"{len(news_items)} news items loaded", "done"))
+        lines.append("## Latest Market News (Live)")
+        for n in news_items[:5]:
             headline = n.get("title") or n.get("headline") or json.dumps(n, ensure_ascii=False)[:100]
-            lines.append(f"- {headline}")
+            source = n.get("source", "")
+            lines.append(f"- [{source}] {headline}" if source else f"- {headline}")
         lines.append("")
     else:
         events.append(_status_event("fetch_news", "No news available", "done"))
