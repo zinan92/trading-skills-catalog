@@ -20,20 +20,25 @@ module.exports = async function handler(req, res) {
 
   const { message, history = [], user_profile = '', provider = 'minimax', api_key = '' } = req.body || {};
 
+  // Set SSE headers early so we can send status events during data prefetch
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+
+  function sendStatus(step, label, state) {
+    res.write('data: ' + JSON.stringify({ type: 'status', step: step, label: label, state: state }) + '\n\n');
+  }
+
   let system = SYSTEM_PROMPT;
   if (user_profile) system += '\n\n## Current User Profile\n' + user_profile;
 
   // Pre-fetch market data based on user message
-  var marketData = await fetchMarketContext(message);
+  var marketData = await fetchMarketContext(message, sendStatus);
   if (marketData) {
     system += '\n\n## Live Market Data (just fetched)\n' + marketData;
   }
 
   const messages = history.map(function(m) { return { role: m.role, content: m.content }; });
   messages.push({ role: 'user', content: message });
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
 
   try {
     if (provider === 'anthropic') {
@@ -252,14 +257,22 @@ function isAShareQuery(msg) {
   return /A股|a股|沪深|创业板|涨停|跌停|板块|概念|茅台|宁德|上证|深证|科创板|港股通/.test(msg);
 }
 
-async function fetchMarketContext(message) {
+async function fetchMarketContext(message, sendStatus) {
+  var notify = sendStatus || function() {};
   var lines = [];
   var pipelineOk = false;
 
   // 1. Try quant-data-pipeline for US market summary (always)
+  notify('fetch_indexes', 'Fetching market indexes...', 'running');
   var usSummary = await httpGet(PIPELINE_BASE + '/api/us-stock/summary', 4000);
   if (usSummary && usSummary.indexes) {
     pipelineOk = true;
+    var indexSummary = usSummary.indexes.map(function(idx) {
+      var name = idx.cn_name || idx.name;
+      var pct = idx.change_pct ? ' (' + idx.change_pct.toFixed(2) + '%)' : '';
+      return name + ' ' + idx.price + pct;
+    }).join(', ');
+    notify('fetch_indexes', indexSummary, 'done');
     lines.push('## US Market (Live from quant-data-pipeline)');
     lines.push('| Index | Price | Change% | Volume |');
     lines.push('|-------|-------|---------|--------|');
@@ -267,17 +280,25 @@ async function fetchMarketContext(message) {
       lines.push('| ' + (idx.cn_name || idx.name) + ' | ' + idx.price + ' | ' + (idx.change_pct ? idx.change_pct.toFixed(2) + '%' : '-') + ' | ' + (idx.volume ? (idx.volume/1e9).toFixed(1) + 'B' : '-') + ' |');
     });
     lines.push('');
+  } else {
+    notify('fetch_indexes', 'Pipeline unavailable, using Yahoo Finance fallback', 'done');
   }
 
   // 2. Fetch specific US stock quotes if mentioned
   var tickers = extractUSTickers(message);
   if (tickers.length > 0 && pipelineOk) {
+    notify('fetch_stocks', 'Fetching ' + tickers.join(', ') + '...', 'running');
     var quotes = [];
     for (var i = 0; i < tickers.length; i++) {
       var q = await httpGet(PIPELINE_BASE + '/api/us-stock/quote/' + tickers[i], 3000);
       if (q && q.price) quotes.push(q);
     }
     if (quotes.length > 0) {
+      var stockSummary = quotes.map(function(q) {
+        var pct = q.change_pct ? ' (' + q.change_pct.toFixed(2) + '%)' : '';
+        return q.symbol + ' $' + q.price + pct;
+      }).join(', ');
+      notify('fetch_stocks', stockSummary, 'done');
       lines.push('## Stock Quotes (Live)');
       lines.push('| Symbol | Name | Price | Change% | Volume | Market Cap | PE |');
       lines.push('|--------|------|-------|---------|--------|-----------|-----|');
@@ -285,6 +306,8 @@ async function fetchMarketContext(message) {
         lines.push('| ' + q.symbol + ' | ' + (q.cn_name || q.name) + ' | $' + q.price + ' | ' + (q.change_pct ? q.change_pct.toFixed(2) + '%' : '-') + ' | ' + (q.volume ? (q.volume/1e6).toFixed(1) + 'M' : '-') + ' | $' + (q.market_cap ? (q.market_cap/1e9).toFixed(1) + 'B' : '-') + ' | ' + (q.pe_ratio ? q.pe_ratio.toFixed(1) : '-') + ' |');
       });
       lines.push('');
+    } else {
+      notify('fetch_stocks', 'No quotes available for ' + tickers.join(', '), 'done');
     }
   }
 
@@ -329,11 +352,12 @@ async function fetchMarketContext(message) {
   if (lines.length > 0) {
     lines.unshift('Data fetched at: ' + new Date().toISOString());
     lines.push('IMPORTANT: Use this REAL live data in your analysis. These are actual market prices right now.');
+    notify('routing', 'Analyzing with trading methodologies...', 'done');
     return lines.join('\n');
   }
 
   // Fallback: Yahoo Finance (for Vercel deployment without pipeline access)
-  return fetchYahooFallback(message);
+  return fetchYahooFallback(message, notify);
 }
 
 // Yahoo v8 chart API — still works from servers (v7 quote API is deprecated)
@@ -376,18 +400,26 @@ function fetchYahooQuote(symbol, timeout) {
   });
 }
 
-async function fetchYahooFallback(message) {
+async function fetchYahooFallback(message, notify) {
+  notify = notify || function() {};
   var tickers = extractUSTickers(message);
   // Always fetch index data + mentioned tickers
   var indexSymbols = ['^GSPC', '^IXIC', '^DJI'];
   var lines = [];
 
   // Fetch indexes in parallel
+  notify('fetch_indexes', 'Fetching S&P 500, NASDAQ, Dow Jones...', 'running');
   var indexResults = await Promise.all(indexSymbols.map(function(s) { return fetchYahooQuote(s, 4000); }));
   var indexNames = { '^GSPC': 'S&P 500', '^IXIC': 'NASDAQ', '^DJI': 'Dow Jones' };
   var hasIndex = indexResults.some(function(r) { return r !== null; });
 
   if (hasIndex) {
+    var indexSummary = indexResults.filter(function(q) { return q !== null; }).map(function(q) {
+      var name = indexNames[q.symbol] || q.name;
+      var pct = q.change_pct !== null ? ' (' + q.change_pct.toFixed(2) + '%)' : '';
+      return name + ' ' + q.price.toFixed(2) + pct;
+    }).join(', ');
+    notify('fetch_indexes', indexSummary, 'done');
     lines.push('## US Market Indexes (Live from Yahoo Finance)');
     lines.push('| Index | Price | Change% |');
     lines.push('|-------|-------|---------|');
@@ -397,13 +429,21 @@ async function fetchYahooFallback(message) {
       lines.push('| ' + name + ' | ' + q.price.toFixed(2) + ' | ' + (q.change_pct !== null ? q.change_pct.toFixed(2) + '%' : '-') + ' |');
     });
     lines.push('');
+  } else {
+    notify('fetch_indexes', 'Market data temporarily unavailable', 'done');
   }
 
   // Fetch specific stock quotes
   if (tickers.length > 0) {
+    notify('fetch_stocks', 'Fetching ' + tickers.join(', ') + '...', 'running');
     var stockResults = await Promise.all(tickers.map(function(t) { return fetchYahooQuote(t, 3000); }));
     var validStocks = stockResults.filter(function(r) { return r !== null; });
     if (validStocks.length > 0) {
+      var stockSummary = validStocks.map(function(q) {
+        var pct = q.change_pct !== null ? ' (' + q.change_pct.toFixed(2) + '%)' : '';
+        return q.symbol + ' $' + q.price.toFixed(2) + pct;
+      }).join(', ');
+      notify('fetch_stocks', stockSummary, 'done');
       lines.push('## Stock Quotes (Live from Yahoo Finance)');
       lines.push('| Symbol | Name | Price | Change% |');
       lines.push('|--------|------|-------|---------|');
@@ -411,12 +451,15 @@ async function fetchYahooFallback(message) {
         lines.push('| ' + q.symbol + ' | ' + q.name + ' | $' + q.price.toFixed(2) + ' | ' + (q.change_pct !== null ? q.change_pct.toFixed(2) + '%' : '-') + ' |');
       });
       lines.push('');
+    } else {
+      notify('fetch_stocks', 'No quotes available for ' + tickers.join(', '), 'done');
     }
   }
 
   if (lines.length > 0) {
     lines.unshift('Data fetched at: ' + new Date().toISOString());
     lines.push('IMPORTANT: Use this REAL live data in your analysis. These are actual market prices. Do NOT make up different prices.');
+    notify('routing', 'Analyzing with trading methodologies...', 'done');
     return lines.join('\n');
   }
   return null;
