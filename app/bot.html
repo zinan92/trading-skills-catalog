@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trading Bot</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232563EB'/><text y='72' x='15' font-size='60' font-weight='bold' fill='white'>TC</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.5/dist/purify.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F8F9FC; --surface: #FFFFFF; --border: #E2E6EF;
+      --text: #1A1F36; --text-dim: #8492A6;
+      --accent: #2563EB; --accent-light: rgba(37,99,235,0.08);
+      --green: #10B981; --red: #EF4444;
+      --radius: 16px;
+      --font: 'DM Sans', -apple-system, system-ui, sans-serif;
+      --mono: 'DM Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    .header { display: flex; align-items: center; padding: 0.75rem 1.5rem; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .logo { font-weight: 700; font-size: 1rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem; }
+    .logo-icon { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, #2563EB, #1D4ED8); display: flex; align-items: center; justify-content: center; color: white; font-size: 0.85rem; font-weight: 700; }
+    .skill-badge { padding: 0.2rem 0.6rem; border-radius: 6px; background: var(--accent-light); color: var(--accent); font-size: 0.75rem; font-weight: 600; }
+    .header-right { margin-left: auto; }
+    .hdr-btn { padding: 0.35rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-dim); font-size: 0.78rem; cursor: pointer; font-family: var(--font); text-decoration: none; }
+    .hdr-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    .landing { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; background: radial-gradient(ellipse at 50% 0%, rgba(37,99,235,0.06) 0%, transparent 60%), var(--bg); }
+    .landing.hidden { display: none; }
+    .landing h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 700; color: var(--text); margin-bottom: 0.4rem; text-align: center; }
+    .landing .desc { font-size: 0.95rem; color: var(--text-dim); margin-bottom: 2rem; text-align: center; max-width: 500px; line-height: 1.6; }
+    .landing-input { width: 100%; max-width: 600px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 4px 24px rgba(0,0,0,0.04); padding: 1rem; }
+    .landing-input:focus-within { border-color: var(--accent); box-shadow: 0 4px 32px rgba(37,99,235,0.08); }
+    .landing-input textarea { width: 100%; border: none; outline: none; font-size: 1rem; font-family: var(--font); color: var(--text); background: transparent; resize: none; min-height: 48px; max-height: 120px; line-height: 1.5; }
+    .landing-input textarea::placeholder { color: var(--text-dim); }
+    .landing-input-footer { display: flex; align-items: center; justify-content: flex-end; margin-top: 0.5rem; }
+    .send-btn { width: 36px; height: 36px; border: none; border-radius: 10px; background: var(--accent); color: white; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
+    .send-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+    .send-btn:hover:not(:disabled) { opacity: 0.85; }
+    .examples { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 1.5rem; max-width: 600px; }
+    .example-btn { padding: 0.45rem 0.9rem; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text); font-size: 0.8rem; cursor: pointer; font-family: var(--font); }
+    .example-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+    .chat-view { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+    .chat-view.active { display: flex; }
+    .messages { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem; max-width: 720px; width: 100%; margin: 0 auto; }
+    .msg { max-width: 85%; padding: 0.85rem 1.1rem; border-radius: 14px; font-size: 0.92rem; line-height: 1.7; word-wrap: break-word; }
+    .msg.user { align-self: flex-end; background: #2563EB; color: white; border-bottom-right-radius: 4px; }
+    .msg.assistant { align-self: flex-start; background: #F1F3F9; color: var(--text); border-bottom-left-radius: 4px; max-width: 90%; position: relative; }
+    .msg.assistant.streaming .msg-content::after { content: '\u2588'; animation: blink 0.8s infinite; color: var(--accent); }
+    @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+    .msg.assistant h1,.msg.assistant h2,.msg.assistant h3 { margin: 0.8rem 0 0.4rem; color: var(--text); }
+    .msg.assistant h1 { font-size: 1.1rem; } .msg.assistant h2 { font-size: 1rem; } .msg.assistant h3 { font-size: 0.95rem; color: var(--accent); }
+    .msg.assistant p { margin: 0.3rem 0; } .msg.assistant ul,.msg.assistant ol { margin: 0.3rem 0 0.3rem 1.2rem; }
+    .msg.assistant li { margin: 0.15rem 0; } .msg.assistant strong { color: var(--text); font-weight: 600; }
+    .msg.assistant code { background: rgba(0,0,0,0.04); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.82rem; font-family: var(--mono); }
+    .msg.assistant pre { background: #1A1F36; color: #E5E7EB; border-radius: 10px; padding: 0.8rem; overflow-x: auto; margin: 0.5rem 0; }
+    .msg.assistant pre code { background: none; padding: 0; color: inherit; }
+    .msg.assistant table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.82rem; }
+    .msg.assistant th { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 2px solid var(--border); font-weight: 600; color: var(--text-dim); }
+    .msg.assistant td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
+    .msg.assistant a { color: var(--accent); }
+    .msg.assistant blockquote { border-left: 3px solid var(--border); padding: 0.5rem 0.8rem; margin: 0.4rem 0; color: var(--text-dim); }
+    .msg.assistant hr { border: none; border-top: 1px solid var(--border); margin: 0.8rem 0; }
+    .msg-time { font-size: 0.65rem; color: var(--text-dim); opacity: 0.5; margin-top: 0.3rem; }
+    .msg.user .msg-time { text-align: right; }
+    .chat-input-bar { border-top: 1px solid var(--border); background: var(--surface); padding: 0.75rem; flex-shrink: 0; }
+    .chat-input-inner { max-width: 720px; margin: 0 auto; display: flex; gap: 0.5rem; align-items: flex-end; }
+    .chat-input-inner textarea { flex: 1; border: 1px solid var(--border); border-radius: 12px; padding: 0.65rem 0.9rem; font-size: 0.92rem; resize: none; font-family: var(--font); outline: none; background: var(--bg); color: var(--text); min-height: 42px; max-height: 120px; }
+    .chat-input-inner textarea:focus { border-color: var(--accent); background: var(--surface); }
+    .thinking { align-self: flex-start; background: #F1F3F9; border-radius: 14px; border-bottom-left-radius: 4px; padding: 0.6rem 0.9rem; font-size: 0.8rem; color: var(--text-dim); display: flex; align-items: center; gap: 0.5rem; }
+    .thinking-spinner { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .thinking.collapsing { animation: collapse 0.3s ease forwards; }
+    @keyframes collapse { to { opacity: 0; max-height: 0; padding: 0; margin: 0; overflow: hidden; } }
+    @media (max-width: 640px) { .landing h1 { font-size: 1.5rem; } .msg { max-width: 95%; } .msg.assistant { max-width: 98%; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">TC</div>
+      <span id="botName">Trading Bot</span>
+      <span class="skill-badge" id="skillBadge"></span>
+    </div>
+    <div class="header-right">
+      <a href="/" class="hdr-btn">All Bots</a>
+    </div>
+  </div>
+  <div class="main">
+    <div class="landing" id="landing">
+      <h1 id="landingTitle">Trading Bot</h1>
+      <p class="desc" id="landingDesc">Loading...</p>
+      <div class="landing-input">
+        <textarea id="landingInput" placeholder="Ask a question..." rows="2"></textarea>
+        <div class="landing-input-footer"><button class="send-btn" id="landingSend" disabled>&#8593;</button></div>
+      </div>
+      <div class="examples" id="examples"></div>
+    </div>
+    <div class="chat-view" id="chatView">
+      <div class="messages" id="messages"></div>
+      <div class="chat-input-bar"><div class="chat-input-inner">
+        <textarea id="chatInput" placeholder="Continue..." rows="1"></textarea>
+        <button class="send-btn" id="chatSend" disabled>&#8593;</button>
+      </div></div>
+    </div>
+  </div>
+  <script>
+    (function() {
+      var pathParts = window.location.pathname.split('/').filter(Boolean);
+      var skillName = pathParts.length >= 2 ? pathParts[pathParts.length - 1] : '';
+      if (!skillName) { document.getElementById('landingDesc').textContent = 'No skill specified.'; return; }
+
+      var SKILLS = {
+        'canslim-screener': { title: 'CANSLIM Screener', desc: "Screen stocks using William O'Neil's 7-factor growth methodology.", examples: ['Screen for CANSLIM stocks right now', 'Is NVDA a CANSLIM candidate?', 'Find top growth stocks'] },
+        'vcp-screener': { title: 'VCP Breakout Scanner', desc: "Find Minervini's Volatility Contraction Patterns.", examples: ['Screen S&P 500 for VCP patterns', 'Is AAPL forming a VCP?', 'Find breakout candidates'] },
+        'stanley-druckenmiller-investment': { title: 'Druckenmiller Strategy', desc: 'Market conviction score (0-100) with allocation recommendations.', examples: ['What is my conviction level?', 'How should I position?', 'Run the strategy synthesizer'] },
+        'tech-earnings-deepdive': { title: 'Tech Earnings Deep Dive', desc: '16-module institutional earnings analysis.', examples: ['Analyze NVDA latest earnings', 'Deep dive META Q4', 'Should I hold MSFT?'] },
+        'us-value-investing': { title: 'Value Investing', desc: 'ROE, debt safety, FCF, and moat assessment.', examples: ['Is AAPL a good value stock?', 'Analyze BRK fundamentals', 'Find undervalued large caps'] },
+        'market-top-detector': { title: 'Market Top Detector', desc: "O'Neil distribution days + leadership deterioration.", examples: ['Is the market topping?', 'Distribution day count?', 'Reduce exposure?'] },
+        'ftd-detector': { title: 'FTD Detector', desc: "Confirm market bottoms with O'Neil's methodology.", examples: ['Any follow-through days?', 'Is this a rally attempt?', 'Safe to add exposure?'] },
+        'position-sizer': { title: 'Position Sizer', desc: '1% rule, Kelly criterion, ATR-based sizing.', examples: ['Size NVDA position with $100K', 'Calculate with 8% stop', 'Risk per trade?'] },
+        'macro-regime-detector': { title: 'Macro Regime', desc: 'Cross-asset regime transitions.', examples: ['Current macro regime?', 'Broadening or concentrating?', 'Regime shift signals?'] },
+        'options-strategy-advisor': { title: 'Options Advisor', desc: 'Black-Scholes, Greeks, P/L simulation.', examples: ['Best strategy for NVDA earnings?', 'Covered call on AAPL?', 'Iron condor for SPY?'] },
+        'us-stock-analysis': { title: 'Stock Analysis', desc: 'Full fundamental + technical analysis.', examples: ['Full analysis of TSLA', 'Compare NVDA vs AMD', 'Report on GOOGL'] },
+        'sector-analyst': { title: 'Sector Rotation', desc: 'Sector rotation and cycle positioning.', examples: ['Which sectors lead?', 'Cyclical vs defensive?', 'Best sectors now?'] },
+        'market-breadth-analyzer': { title: 'Market Breadth', desc: '0-100 composite breadth score.', examples: ['How healthy is breadth?', 'Is the rally broad?', 'A/D analysis?'] },
+        'scenario-analyzer': { title: 'Scenario Analyzer', desc: '18-month scenario trees from news.', examples: ['What if Fed hikes 50bp?', 'China tariff impact?', 'Oil shock scenario?'] },
+      };
+
+      var meta = SKILLS[skillName] || { title: skillName.replace(/-/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();}), desc: 'Ask any question about this methodology.', examples: ['How does this work?', 'Apply to NVDA', 'What signals to watch?'] };
+      document.title = meta.title + ' \u2014 Trading Copilot';
+      document.getElementById('botName').textContent = meta.title;
+      document.getElementById('skillBadge').textContent = skillName;
+      document.getElementById('landingTitle').textContent = meta.title;
+      document.getElementById('landingDesc').textContent = meta.desc;
+
+      var examplesEl = document.getElementById('examples');
+      meta.examples.forEach(function(ex) {
+        var btn = document.createElement('button');
+        btn.className = 'example-btn';
+        btn.textContent = ex;
+        btn.addEventListener('click', function() { landingInput.value = ex; doSend(landingInput); });
+        examplesEl.appendChild(btn);
+      });
+
+      var state = { streaming: false, currentMsg: null, history: [], inChat: false };
+      var landingEl = document.getElementById('landing');
+      var chatViewEl = document.getElementById('chatView');
+      var messagesEl = document.getElementById('messages');
+      var landingInput = document.getElementById('landingInput');
+      var landingSend = document.getElementById('landingSend');
+      var chatInput = document.getElementById('chatInput');
+      var chatSend = document.getElementById('chatSend');
+      var thinkingEl = null;
+
+      function setupInput(input, btn) {
+        input.addEventListener('input', function() { btn.disabled = !input.value.trim() || state.streaming; input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 120) + 'px'; });
+        input.addEventListener('keydown', function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!btn.disabled) doSend(input); } });
+        btn.addEventListener('click', function() { doSend(input); });
+      }
+      setupInput(landingInput, landingSend);
+      setupInput(chatInput, chatSend);
+
+      function enterChatMode() { state.inChat = true; landingEl.classList.add('hidden'); chatViewEl.classList.add('active'); }
+
+      function addMsg(role, text) {
+        var div = document.createElement('div'); div.className = 'msg ' + role;
+        var content = document.createElement('div'); content.className = 'msg-content'; content.textContent = text; div.appendChild(content);
+        var time = document.createElement('div'); time.className = 'msg-time';
+        var now = new Date(); time.textContent = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+        div.appendChild(time);
+        messagesEl.appendChild(div); messagesEl.scrollTop = messagesEl.scrollHeight; return div;
+      }
+
+      function renderMd(el, text) {
+        var target = el.querySelector('.msg-content') || el;
+        if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') { target.innerHTML = DOMPurify.sanitize(marked.parse(text)); }
+        else { target.textContent = text; }
+      }
+
+      function showThinking() {
+        thinkingEl = document.createElement('div'); thinkingEl.className = 'thinking';
+        var sp = document.createElement('span'); sp.className = 'thinking-spinner'; thinkingEl.appendChild(sp);
+        var label = document.createElement('span'); label.textContent = 'Analyzing with ' + (SKILLS[skillName] ? SKILLS[skillName].title : skillName) + '...';
+        thinkingEl.appendChild(label);
+        messagesEl.appendChild(thinkingEl); messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function hideThinking() {
+        if (thinkingEl) { thinkingEl.classList.add('collapsing'); setTimeout(function() { if (thinkingEl && thinkingEl.parentNode) thinkingEl.remove(); thinkingEl = null; }, 300); }
+      }
+
+      function doSend(inputEl) {
+        var text = inputEl.value.trim();
+        if (!text || state.streaming) return;
+        if (!state.inChat) enterChatMode();
+        addMsg('user', text);
+        state.history.push({ role: 'user', content: text });
+        inputEl.value = ''; inputEl.style.height = 'auto';
+        landingSend.disabled = true; chatSend.disabled = true;
+        state.streaming = true;
+        showThinking(); chatInput.focus();
+
+        fetch('/api/skill-chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, history: state.history.slice(0, -1), skill: skillName })
+        }).then(function(response) {
+          if (!response.ok) throw new Error('API error: ' + response.status);
+          var reader = response.body.getReader(); var decoder = new TextDecoder(); var buffer = ''; var fullText = ''; var renderTimer = null;
+          function scheduleRender() { if (renderTimer) return; renderTimer = setTimeout(function() { renderTimer = null; if (state.currentMsg && fullText) { renderMd(state.currentMsg, fullText); autoScroll(); } }, 100); }
+          function read() {
+            reader.read().then(function(result) {
+              if (result.done) { if (renderTimer) clearTimeout(renderTimer); finish(fullText); return; }
+              buffer += decoder.decode(result.value, { stream: true }); var lines = buffer.split('\n'); buffer = lines.pop();
+              lines.forEach(function(line) {
+                if (!line.startsWith('data: ')) return;
+                try {
+                  var data = JSON.parse(line.slice(6));
+                  if (data.type === 'text') {
+                    if (!state.currentMsg) { hideThinking(); state.currentMsg = addMsg('assistant', ''); state.currentMsg.classList.add('streaming'); }
+                    fullText += data.text; scheduleRender();
+                  } else if (data.type === 'done') { if (renderTimer) clearTimeout(renderTimer); finish(fullText); }
+                  else if (data.type === 'error') { hideThinking(); if (!state.currentMsg) state.currentMsg = addMsg('assistant', ''); state.currentMsg.querySelector('.msg-content').textContent = data.error || 'Error'; finish(''); }
+                } catch(e) {}
+              });
+              read();
+            }).catch(function(err) { hideThinking(); if (!state.currentMsg) state.currentMsg = addMsg('assistant', ''); state.currentMsg.querySelector('.msg-content').textContent = err.message; finish(''); });
+          }
+          read();
+        }).catch(function(err) { hideThinking(); if (!state.currentMsg) state.currentMsg = addMsg('assistant', ''); state.currentMsg.querySelector('.msg-content').textContent = err.message; finish(''); });
+      }
+
+      function finish(fullText) {
+        if (!state.streaming) return;
+        if (state.currentMsg) { state.currentMsg.classList.remove('streaming'); if (fullText) { renderMd(state.currentMsg, fullText); autoScroll(); } }
+        if (fullText) state.history.push({ role: 'assistant', content: fullText });
+        state.currentMsg = null; state.streaming = false;
+        chatSend.disabled = !chatInput.value.trim(); chatInput.focus();
+      }
+
+      function autoScroll() { var near = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 150; if (near) messagesEl.scrollTop = messagesEl.scrollHeight; }
+    })();
+  </script>
+</body>
+</html>
